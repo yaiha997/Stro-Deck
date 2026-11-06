@@ -1,92 +1,121 @@
-# Stream Deck PC — تحكم بجهازك من شاشة/تابلت
+# Stream Deck PC
 
-تطبيق واحد `StreamDeckPC.exe` يفتح صفحة تحكم بالمربعات على الشبكة، وتخصصها من نافذة التطبيق على سطح المكتب.
+Stream Deck PC turns a Windows computer into a customizable remote control. It runs a small web server on the computer and serves a button grid to a browser on another device on the same local network. Configure buttons in the desktop app; pressing a button in the browser performs its configured action on the Windows computer.
 
----
+## Requirements
 
-## 1) التشغيل
+- Windows
+- A phone, tablet, or other browser-enabled device on the same local network
+- Windows PowerShell and the .NET Framework C# compiler (`csc.exe`) to rebuild from source
+- Optional: Google Nest Hub with WebView remote debugging enabled
+- Optional: OpenCode and Windows Terminal for the Greeting project launcher described below
 
-- افتح الاختصار **Stream Deck PC** من سطح المكتب (أو `StreamDeckPC.exe`).
-- راح يطلع لك فوق رابط مثل: `http://192.168.1.8:8090/`
-- افتح نفس الرابط في متصفح الجهاز الآخر (تابلت / شاشة ذكية / جوال).
-- أول مرة راح يسألك ويندوز عن الجدار الناري → اضغط **Allow access**. أو اضغط زر **Allow firewall** داخل التطبيق.
+## Run the application
 
-> **مهم:** الجهازين لازم يكونون على نفس الشبكة. في الصور ظهر أن الشاشة على `192.168.68.102` والكمبيوتر على `192.168.1.8` — هذي شبكتين مختلفتين، فلازم توصّل الشاشة على شبكة الكمبيوتر (أو الكمبيوتر على شبكة الشاشة) قبل ما يفتح الرابط.
+1. Start `StreamDeckPC.exe`.
+2. The desktop app displays the address to use, for example `http://192.168.1.8:8090/`.
+3. Open that address in a browser on the other device. Both devices must be on the same reachable network.
+4. If Windows Firewall prompts you, allow the app on your trusted private network.
 
----
+The server listens on port 8090 by default and tries the next 19 ports if that port is unavailable. The displayed address reflects the active port and computer IP address.
 
-## 2) التخصيص (من الـ exe)
+## How it works
 
-1. اختر المربع من الشبكة.
-2. عدّل:
-   - **Label**: الاسم اللي يظهر تحت الأيقونة.
-   - **Icon**: أي إيموجي، مثال 🌐 📁 🎵 ⚡.
-   - **Color**: لون المربع.
-   - **Action**: نوع العملية.
-   - **Target**: الأمر/المسار.
-3. اضغط **Save button**.
-4. **ترتيب بالسحب:** اسحب أي مربع في نافذة التطبيق وأفلته على مربع ثاني — يتبادلون الأماكن تلقائيًا.
-5. **أيقونة صورة:** اضغط **Pick icon image** واختر صورة (PNG/JPG/GIF/WEBP)، أو اسحب ملف الصورة وأفلته على خانة Icon. الصور تُنسخ لمجلد `icons` وتُخدم تلقائيًا على الشاشة.
-6. ممكن تغيّر عدد الأعمدة والصفوف من فوق (**Cols / Rows**) — الصفحة تتحدث لحالها خلال ثواني.
-7. **الخلفية:** زر **Background image** يختار صورة بأي دقة (تُحفظ كما هي بدون تصغير)، وقائمة **Position** تحدد الجهة/النقطة: center / top / bottom / left / right / top left / top right / bottom left / bottom right. وزر **Remove** يرجع الخلفية سوداء.
-8. المربعات تلقائيًا **زجاج حقيقي** (blur + تشبّع + انعكاس علوي) يتأثر بألوان الخلفية تحتها.
+1. `Program.cs` starts the Windows Forms desktop application.
+2. `MainForm.cs` provides the button editor, server controls, and configuration persistence.
+3. `Deck.cs` loads the deck settings, runs the local HTTP server, and dispatches button actions.
+4. `deck.html` is embedded into the executable and rendered by the remote device's browser. The page requests the current deck state from `/api/state` and sends button presses to `/api/press`.
+5. Button actions run on the Windows computer. They can open apps and websites, run CMD or PowerShell commands, send keyboard/media input, type text, or perform power actions.
 
-الزر **Test action** يجرّب الأمر من الكمبيوتر مباشرة قبل ما تستخدمه من الشاشة.
+The configuration is stored in `deck-config.txt` beside the executable and is managed by the desktop app. The app creates default buttons when no configuration exists.
 
----
+## Customize the deck
 
-## 3) أنواع الأوامر
+Select a button in the desktop app, edit its label, icon, color, action, and target, then select **Save button**. Use **Test action** to try an action on the computer. Drag buttons to swap their positions, or change the number of columns and rows.
 
-| Action | Target (مثال) | النتيجة |
+The editor can also select image icons and a background image. Images are copied into the `icons` and `backgrounds` folders so the web page can serve them. The background position, clock display, and other appearance options are configurable in the app.
+
+Available action types include:
+
+| Action | Example target | Result |
 |---|---|---|
-| Open app / file | `chrome.exe` — `C:\Windows\notepad.exe` — `ms-settings:` — `C:\folder` | يفتح البرنامج/الملف/المجلد |
-| Open website | `https://youtube.com` | يفتح الموقع |
-| Run CMD command | `explorer C:\Users\pc\Desktop` | ينفذ أمر CMD |
-| Run PowerShell | `Stop-Process -Name notepad` | ينفذ سكربت |
-| Media key | `play` / `next` / `prev` / `stop` / `mute` / `volup` / `voldown` | مفاتيح الوسائط |
-| Send keys | `win+shift+s` / `ctrl+shift+esc` / `alt+f4` / `f5` | يرسل اختصار كيبورد |
-| Type text | أي نص | يكتبه في النافذة المفتوحة |
-| Lock / Sleep / Monitor off / Shutdown / Restart | — | أوامر النظام |
+| Open app / file | `notepad.exe`, `C:\Work`, `ms-settings:` | Opens an app, file, folder, or Windows URI |
+| Open website | `https://example.com` | Opens a website |
+| Run CMD command | `explorer C:\Work` | Runs a command on the Windows computer |
+| Run PowerShell | `Get-Process` | Runs a PowerShell command |
+| Media key | `play`, `next`, `mute`, `volup` | Sends a media control |
+| Send keys | `win+shift+s`, `ctrl+shift+esc` | Sends a keyboard shortcut |
+| Type text | `Hello` | Types text into the active window |
+| System action | `lock`, `sleep`, `monitoroff`, `shutdown`, `restart` | Performs the selected system action |
 
-أمثلة جاهزة:
-- تصوير الشاشة: `key` + `win+shift+s`
-- مدير المهام: `app` + `taskmgr.exe`
-- فتح سبوتيفاي: `app` + `spotify.exe`
-- قفل الجهاز: `lock`
+### Launch OpenCode in the Greeting project
 
----
+To add an OpenCode button:
 
-## 4) ملفات المشروع
+1. Confirm OpenCode is installed and available from a terminal as `opencode`. Install Windows Terminal if you want the button to open a visible terminal window.
+2. In the desktop app, select an unused button and set its label to `OpenCode`, choose an icon, and set **Action** to **Run CMD command**.
+3. Set **Target** to the following command, replacing the example path if your `Greeting` project is elsewhere:
 
-| ملف | الوظيفة |
+   ```cmd
+   start "" wt.exe -d "C:\Users\pc\Documents\Greeting" opencode
+   ```
+
+4. Save the button and select **Test action**. Pressing the button opens Windows Terminal in the `Greeting` project directory and starts OpenCode there.
+
+This button launches OpenCode in the existing project folder; it does not create or copy the `Greeting` project.
+
+## Google Nest Hub
+
+For a Nest Hub that supports WebView remote debugging:
+
+1. On the Hub, open **Settings → About**, select **Fuchsia version** repeatedly to enable Developer Options, and enable **WebView remote debugging**.
+2. Ensure the Hub and computer are on the same network.
+3. Run a connectivity check:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\hub-check.ps1 -Ip <hub-ip>
+   ```
+
+4. If DevTools is available, navigate the Hub WebView to the Stream Deck page:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\hub-push.ps1 -Ip <hub-ip> -Port 9222 -Url http://<computer-ip>:8090/
+   ```
+
+Casting a Chrome tab can display the page, but does not forward touch input.
+
+## Build from source
+
+Run this from PowerShell in the project directory:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build.ps1
+```
+
+The build script compiles `Deck.cs`, `Ui.cs`, `MainForm.cs`, and `Program.cs`, embeds `deck.html`, and produces `StreamDeckPC.exe`. Rebuild after changing source code or the page.
+
+## Project files
+
+| File or directory | Purpose |
 |---|---|
-| `StreamDeckPC.exe` | التطبيق (سيرفر + نافذة التخصيص) |
-| `deck-config.txt` | إعداداتك (يتولد تلقائيًا — لا تحتاج تعدله) |
-| `deck.html` | تصميم صفحة الشاشة (أسود + مربعات متفرقة) |
-| `Deck.cs` / `MainForm.cs` / `Program.cs` | الكود المصدري |
-| `build.ps1` | إعادة البناء: `powershell -ExecutionPolicy Bypass -File build.ps1` |
+| `StreamDeckPC.exe` | Windows desktop app and local web server |
+| `Deck.cs` | Configuration, action execution, HTTP server, and casting logic |
+| `MainForm.cs`, `Ui.cs`, `Program.cs` | Desktop editor and application startup |
+| `deck.html` | Remote browser interface |
+| `deck-config.txt` | Current app configuration |
+| `build.ps1` | Source build script |
+| `hub-check.ps1`, `hub-push.ps1` | Nest Hub connectivity and WebView helpers |
+| `backgrounds/`, `icons/` | Image assets served by the app |
+| `tools/` | Additional network scanning utilities |
 
-بعد أي تعديل على الكود أو على `deck.html` شغّل `build.ps1` مرة ثانية.
+## Troubleshooting
 
----
+- **The page does not load:** Check that both devices are on the same network, the Windows Firewall allows the app on the private network, and you are using the computer's LAN IP rather than `127.0.0.1`.
+- **The computer's IP changes:** Use the current address displayed by the desktop app.
+- **A button does not work:** Use **Test action** on the computer and confirm the target is valid.
+- **The port is busy:** The server tries ports 8090 through 8109; use the address displayed by the app.
+- **OpenCode does not launch:** Run `opencode` from a terminal first, verify the `Greeting` folder path, and confirm Windows Terminal is installed and available as `wt.exe`.
 
-## 5) Google Nest Hub (Fuchsia)
+## Security
 
-النست هب ما فيه متصفح عادي، فالطريق هو Webview Remote Debugging:
-
-1. من الجهاز: **Settings → About → اضغط Fuchsia version** حتى تفتح Developer Options → شغّل **Webview remote debugging**.
-2. لازم الجهاز والكمبيوتر على نفس الشبكة (نفس الراوتر).
-3. شغّل الفحص: `powershell -ExecutionPolicy Bypass -File hub-check.ps1 -Ip <ip-hub>`
-4. إذا ظهر منفذ DevTools، ادفع الصفحة:
-   `powershell -ExecutionPolicy Bypass -File hub-push.ps1 -Ip <ip-hub> -Port 9222 -Url http://<ip-pc>:8090/`
-
-ملاحظة: Cast Tab من كروم يعرض الصفحة لكن **بدون لمس**، لأن Cast لا يرجّع الإدخال.
-
----
-
-## 6) مشاكل شائعة
-
-- **الصفحة ما تفتح على الجهاز:** تأكد أنهم على نفس الشبكة، وأن الجدار الناري مسموح، وأن الرابط هو IP الكمبيوتر مو `127.0.0.1`.
-- **تغيّر IP الكمبيوتر:** الرابط يتحدث تلقائي في نافذة التطبيق كل ثواني.
-- **المربع ما ينفذ:** جرّب **Test action** من الكمبيوتر؛ إذا شغال هناك فالمشكلة في الشبكة.
-- **المنفذ مشغول:** التطبيق يجرّب 8090 ثم اللي بعده تلقائيًا.
+The local web server does not require authentication, and button actions execute on the Windows computer. Only run the app on a trusted network and do not expose its port to the public internet.
