@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<title>Stream Deck</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0}
+  body{
+    background:#000;
+    background-image:radial-gradient(130% 85% at 50% -10%, #131317 0%, #070709 45%, #000 100%);
+    background-size:cover;background-position:center;background-repeat:no-repeat;background-attachment:fixed;
+    color:#f2f2f4;
+    font-family:"Segoe UI",system-ui,-apple-system,"Noto Sans Arabic",sans-serif;
+    overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation;
+  }
+  body.has-bg::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:linear-gradient(180deg, rgba(0,0,0,.10) 0%, rgba(0,0,0,.28) 55%, rgba(0,0,0,.52) 100%)}
+  header{position:relative;z-index:3;height:58px;display:flex;align-items:center;
+    justify-content:flex-start;padding:0 26px}
+  .clock{display:flex;align-items:baseline;gap:7px;font-variant-numeric:tabular-nums;
+    color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.45)}
+  header.c-bold .clock{font-size:clamp(30px,5.4vh,48px);font-weight:700;letter-spacing:.03em}
+  header.c-thin .clock{font-size:clamp(30px,5.4vh,48px);font-weight:200;letter-spacing:.16em}
+  header.c-small .clock{font-size:17px;font-weight:600;letter-spacing:.06em;color:rgba(255,255,255,.9)}
+  header.c-hidden .clock{display:none}
+  .clock .ap{font-size:.42em;font-weight:600;letter-spacing:.14em;opacity:.72;margin-left:2px}
+  .deck{position:absolute;inset:58px 0 0 0;z-index:1;display:grid;padding:0 16px 16px;
+    align-content:center;justify-items:center}
+  .cell{display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-width:0;min-height:0}
+  .tile{
+    --c:#39ff14;--r:0deg;--x:0px;--y:0px;--s:1;
+    position:relative;width:var(--tile,120px);height:var(--tile,120px);
+    border:1px solid rgba(255,255,255,.30);
+    border-radius:27%;
+    background:linear-gradient(155deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,.040) 45%, rgba(255,255,255,.015) 100%);
+    -webkit-backdrop-filter:blur(22px) saturate(190%) brightness(1.06);
+    backdrop-filter:blur(22px) saturate(190%) brightness(1.06);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -1px 0 rgba(0,0,0,.16),
+      0 10px 26px rgba(0,0,0,.26);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+    transform:rotate(var(--r)) translate(var(--x),var(--y)) scale(var(--s));
+    transition:transform .13s ease,box-shadow .2s ease,background .2s ease;
+    color:#fff;cursor:pointer;padding:0;font:inherit;overflow:hidden;
+  }
+  .tile::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:radial-gradient(120% 58% at 50% -10%, rgba(255,255,255,.30), transparent 60%),
+      radial-gradient(120% 78% at 50% 115%, color-mix(in srgb,var(--c) 16%,transparent), transparent 70%);
+    opacity:.75}
+  .tile .ic{position:relative;font-size:calc(var(--tile,120px)*.31);line-height:1;
+    filter:drop-shadow(0 2px 10px rgba(0,0,0,.45)) drop-shadow(0 0 16px color-mix(in srgb,var(--c) 40%,transparent))}
+  .tile .ic-img{position:relative;width:calc(var(--tile,120px)*.44);height:calc(var(--tile,120px)*.44);
+    object-fit:contain;border-radius:20%;
+    filter:drop-shadow(0 2px 10px rgba(0,0,0,.45)) drop-shadow(0 0 14px color-mix(in srgb,var(--c) 30%,transparent))}
+  .tile .lb{position:relative;margin-top:calc(var(--tile,120px)*.075);
+    font-size:calc(var(--tile,120px)*.086);font-weight:600;
+    letter-spacing:.04em;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.65);
+    max-width:92%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px}
+  .tile.active{transform:rotate(var(--r)) translate(var(--x),var(--y)) scale(calc(var(--s)*.9));
+    box-shadow:0 0 0 2px rgba(255,255,255,.6),
+      0 0 60px color-mix(in srgb,var(--c) 40%,transparent),inset 0 1px 0 rgba(255,255,255,.6)}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,24px);
+    background:#111114;border:1px solid #2a2a32;color:#e8e8ee;padding:11px 22px;border-radius:999px;
+    font-size:14px;opacity:0;transition:all .25s ease;pointer-events:none;z-index:9;
+    max-width:80vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .toast.ok{border-color:#2d5f2a;box-shadow:0 0 24px rgba(57,255,20,.12)}
+  .toast.err{border-color:#6b2b2b;color:#ffb4b4}
+  .offline{position:fixed;top:0;left:0;right:0;height:3px;background:#ff5252;
+    box-shadow:0 0 12px #ff5252;opacity:0;transition:opacity .3s;z-index:10}
+  .offline.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="offline" id="offline"></div>
+<header id="hdr">
+  <div class="clock" id="clock"><span id="clockTime">--:--</span><span class="ap" id="clockAp"></span></div>
+</header>
+<main class="deck" id="deck"></main>
+<div class="toast" id="toast"></div>
+<script>
+(function () {
+  var deck = document.getElementById('deck');
+  var headerEl = document.getElementById('hdr');
+  var clockTimeEl = document.getElementById('clockTime');
+  var clockApEl = document.getElementById('clockAp');
+  var clockFormat = '24';
+  var toastEl = document.getElementById('toast');
+  var offlineEl = document.getElementById('offline');
+  var state = null;
+  var toastTimer = null;
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function tick() {
+    var d = new Date(), h = d.getHours(), m = d.getMinutes(), ap = '';
+    if (clockFormat === '12') {
+      ap = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      if (h === 0) h = 12;
+      clockTimeEl.textContent = h + ':' + pad(m);
+    } else {
+      clockTimeEl.textContent = pad(h) + ':' + pad(m);
+    }
+    clockApEl.textContent = ap;
+  }
+  tick();
+  setInterval(tick, 5000);
+
+  function toast(msg, ok) {
+    toastEl.textContent = msg || '';
+    toastEl.className = 'toast show ' + (ok ? 'ok' : 'err');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.className = 'toast ' + (ok ? 'ok' : 'err'); }, 1900);
+  }
+
+  /* deterministic "scatter" so the layout is stable but not a rigid grid */
+  function scatter(i) {
+    var x = (((i * 53) % 7) - 3) * 0.4;
+    var y = (((i * 29) % 9) - 4) * 0.3;
+    return { r: 0, x: x, y: y, s: 1 };
+  }
+
+  function layout() {
+    if (!state) return;
+    var cs = getComputedStyle(deck);
+    var padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    var padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    var gap = 8;
+    var w = (deck.clientWidth - padX - gap * (state.cols - 1)) / state.cols;
+    var h = (deck.clientHeight - padY - gap * (state.rows - 1)) / state.rows;
+    var size = Math.max(46, Math.min(w, h) * 0.88);
+    deck.style.gap = gap + 'px';
+    deck.style.setProperty('--tile', size + 'px');
+  }
+
+  function applyBackground(s) {
+    var bg = s.bg || '';
+    if (bg.indexOf('img:') === 0) {
+      document.body.classList.add('has-bg');
+      document.body.style.backgroundImage = "url('/bg/" + encodeURIComponent(bg.substring(4)) + "')";
+      document.body.style.backgroundPosition = s.bgpos || 'center';
+    } else {
+      document.body.classList.remove('has-bg');
+      document.body.style.backgroundImage = '';
+    }
+  }
+
+  function render(s) {
+    state = s;
+    applyBackground(s);
+    headerEl.className = 'c-' + (s.clock || 'bold');
+    clockFormat = s.clockfmt || '24';
+    tick();
+    deck.style.gridTemplateColumns = 'repeat(' + s.cols + ',1fr)';
+    deck.style.gridTemplateRows = 'repeat(' + s.rows + ',1fr)';
+    deck.innerHTML = '';
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < s.buttons.length; i++) {
+      (function (b, idx) {
+        var cell = document.createElement('div');
+        cell.className = 'cell';
+        var t = document.createElement('button');
+        t.className = 'tile';
+        t.style.setProperty('--c', b.color || '#39ff14');
+        var sc = scatter(idx);
+        t.style.setProperty('--r', sc.r + 'deg');
+        t.style.setProperty('--x', sc.x + 'px');
+        t.style.setProperty('--y', sc.y + 'px');
+        t.style.setProperty('--s', sc.s);
+        var icon = b.icon || '\u2022';
+        var lb = document.createElement('span');
+        lb.className = 'lb';
+        lb.textContent = b.label || '';
+        if (icon.indexOf('img:') === 0) {
+          var img = document.createElement('img');
+          img.className = 'ic-img';
+          img.alt = '';
+          img.src = '/icons/' + encodeURIComponent(icon.substring(4));
+          t.appendChild(img);
+        } else {
+          var ic = document.createElement('span');
+          ic.className = 'ic';
+          ic.textContent = icon;
+          t.appendChild(ic);
+        }
+        t.appendChild(lb);
+        t.addEventListener('click', function () { press(b, t); });
+        cell.appendChild(t);
+        frag.appendChild(cell);
+      })(s.buttons[i], i);
+    }
+    deck.appendChild(frag);
+    layout();
+  }
+
+  var busy = false;
+  function press(b, el) {
+    el.classList.add('active');
+    setTimeout(function () { el.classList.remove('active'); }, 170);
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+    if (busy) return;
+    busy = true;
+    fetch('/api/press', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: b.id })
+    }).then(function (r) { return r.json(); })
+      .then(function (j) {
+        toast(j.msg || (j.ok ? 'OK' : 'Error'), !!j.ok);
+        offlineEl.className = 'offline';
+      })
+      .catch(function () {
+        toast('\u0644\u0627 \u064a\u0648\u062c\u062f \u0627\u062a\u0635\u0627\u0644 \u0628\u0627\u0644\u0643\u0645\u0628\u064a\u0648\u062a\u0631', false);
+        offlineEl.className = 'offline show';
+      })
+      .then(function () { setTimeout(function () { busy = false; }, 220); });
+  }
+
+  var lastJson = '';
+  function load() {
+    fetch('/api/state', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (s) {
+        offlineEl.className = 'offline';
+        if (s.v) {
+          if (window.__deckV && window.__deckV !== s.v) { location.reload(); return; }
+          window.__deckV = s.v;
+        }
+        var j = JSON.stringify(s);
+        if (j !== lastJson) { lastJson = j; render(s); }
+      })
+      .catch(function () { offlineEl.className = 'offline show'; });
+  }
+
+  // Prevent screen sleep / screensaver via silent audio loop + wake lock
+  function keepAlive() {
+    if ('wakeLock' in navigator) {
+      try { navigator.wakeLock.request('screen').catch(function(){}); } catch(e){}
+    }
+  }
+  keepAlive();
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') { keepAlive(); }
+  });
+
+  window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', function () { setTimeout(layout, 150); });
+  document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  document.addEventListener('dblclick', function () {
+    var el = document.documentElement;
+    if (document.fullscreenElement) { document.exitFullscreen(); }
+    else if (el.requestFullscreen) { el.requestFullscreen(); }
+  });
+  load();
+  setInterval(load, 5000);
+})();
+</script>
+</body>
+</html>
