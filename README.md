@@ -66,23 +66,82 @@ This button launches OpenCode in the existing project folder; it does not create
 
 ## Google Nest Hub
 
-For a Nest Hub that supports WebView remote debugging:
+There are two different ways to use the Hub with this project. The MCP server controls Google Cast playback; the Fuchsia WebView scripts inspect or navigate a debuggable WebView. They are separate tools, and enabling WebView debugging is not required for casting.
 
-1. On the Hub, open **Settings → About**, select **Fuchsia version** repeatedly to enable Developer Options, and enable **WebView remote debugging**.
-2. Ensure the Hub and computer are on the same network.
-3. Run a connectivity check:
+### Option A: Cast Stream Deck with the MCP server
+
+This is the simplest way to show the Stream Deck web page on the Hub.
+
+1. Connect the computer and Hub to the same local network. Make sure the Hub can reach the computer's IP address and Stream Deck's active port.
+2. Start `StreamDeckPC.exe`. Use the address shown by the app, for example `http://<computer-ip>:8090/`. If port 8090 is busy, the app may use another port through 8109.
+3. Install Python, `catt`, and the MCP Python package in the environment you will use to run the server. For example:
+
+   ```powershell
+   py -m pip install catt mcp
+   ```
+
+4. Open `hub_mcp_server.py` and set `HUB_IP` to the Hub's IP address. Set `CATT_PATH` to the full path of the `catt.exe` installed in your Python environment. The `catt` command must be able to reach the Hub.
+5. Add an MCP server entry to Antigravity's MCP configuration. Replace both example paths with the actual Python executable and script paths on your computer:
+
+   ```json
+   {
+     "mcpServers": {
+       "google-nest-hub": {
+         "command": "C:\\Path\\To\\Python\\python.exe",
+         "args": ["C:\\Path\\To\\StreamDeck\\hub_mcp_server.py"]
+       }
+     }
+   }
+   ```
+
+6. Save the MCP configuration and restart or reload the MCP server in Antigravity. The server communicates over standard input/output; its Python process must remain available while Antigravity is using its tools.
+7. Ask the MCP client to call `cast_site` with the Stream Deck URL, such as `http://<computer-ip>:8090/`. Open that same URL on a phone or tablet on the local network if you need to tap buttons; ordinary Cast display does not forward touch input back to Stream Deck.
+
+The MCP tools in `hub_mcp_server.py` are:
+
+| Tool | Input | What it does |
+|---|---|---|
+| `cast_site` | `url` (defaults to the configured example URL) | Runs `catt -d <hub-ip> cast_site <url>` to display a website on the Hub |
+| `stop_cast` | None | Stops the current Cast session |
+| `play_media` | `url` | Runs `catt cast` to play a supported media URL |
+| `set_volume` | `level` from 0 to 100 | Changes the Hub volume using `catt volume` |
+| `hub_status` | None | Gets the Hub's current Cast/playback status |
+
+In plain terms, Antigravity starts the Python MCP server; the MCP server translates a tool call into a local `catt` command; `catt` sends the Cast request to the Hub. This MCP server does not inspect Fuchsia internals or use Chrome DevTools. Its Hub IP and `catt.exe` path are currently configured in the Python file, so update them for your own computer before starting it.
+
+### Option B: Use Fuchsia WebView remote debugging
+
+Use this method only if the Hub exposes a debuggable WebView. It is a separate, manual debugging path and is not one of the tools exposed by `hub_mcp_server.py`.
+
+1. On the Hub, open **Settings → About**, select **Fuchsia version** repeatedly to enable Developer Options, and turn on **WebView remote debugging** if that option is available.
+2. Make sure the Hub and computer are on the same reachable network. Find the Hub IP address in its network or technical information.
+3. Check connectivity and the common debugging ports:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\hub-check.ps1 -Ip <hub-ip>
    ```
 
-4. If DevTools is available, navigate the Hub WebView to the Stream Deck page:
+   The script checks whether the Hub responds to ping, probes a list of TCP ports, and queries `/json/version` and `/json/list` on ports 9222 and 9223 when available. Ping can be blocked even when a TCP port is reachable.
+4. If a DevTools target is listed, use `hub-push.ps1` to connect to the target's WebSocket debugging endpoint and navigate it to the Stream Deck page:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\hub-push.ps1 -Ip <hub-ip> -Port 9222 -Url http://<computer-ip>:8090/
    ```
 
-Casting a Chrome tab can display the page, but does not forward touch input.
+   Use the computer's actual address and the port currently shown by Stream Deck. The helper lists available targets, selects the first page target (or the first target if no page is listed), enables the Page domain, and sends a `Page.navigate` request. The `-List` switch lists targets and exits without navigating:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\hub-push.ps1 -Ip <hub-ip> -Port 9222 -List
+   ```
+
+The Hub must expose a target with a `webSocketDebuggerUrl`; otherwise the script cannot attach. WebView debugging availability depends on the Hub's firmware and settings, so use the Cast method above if no DevTools target is exposed.
+
+### Troubleshooting
+
+- **The Hub cannot load the page:** Confirm Stream Deck is running, use its current IP and port, and check Windows Firewall and local-network access.
+- **`catt` cannot find or control the Hub:** Verify the Hub IP in `hub_mcp_server.py`, install `catt` in the selected Python environment, and point `CATT_PATH` to that environment's `catt.exe`.
+- **The MCP tools do not appear in Antigravity:** Check the JSON configuration paths, ensure the MCP Python package is installed in the configured Python environment, then reload the MCP server and inspect its startup errors.
+- **No DevTools targets appear:** Confirm WebView remote debugging is enabled and that the Hub exposes port 9222 or 9223. Casting a page does not itself enable WebView debugging.
 
 ## Build from source
 
