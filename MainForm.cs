@@ -818,13 +818,13 @@ namespace StroDeck
             if (miStartWin != null) miStartWin.Checked = IsStartWithWindows();
             if (miStartTray != null) miStartTray.Checked = cfg.StartInTray;
             if (miCastStatus != null)
-                miCastStatus.Text = "Cast: " + (caster != null ? caster.LastStatus : "Off");
+                miCastStatus.Text = "Cast: " + LocalAddresses.RedactIpv4(caster != null ? caster.LastStatus : "Off");
         }
 
         void UpdateCastStatus()
         {
             if (caster == null) return;
-            string st = caster.LastStatus ?? "Off";
+            string st = LocalAddresses.RedactIpv4(caster.LastStatus ?? "Off");
 
             if (lblCast != null)
             {
@@ -1464,33 +1464,7 @@ namespace StroDeck
 
         static List<string> ScanLocalIps()
         {
-            List<string> wifi = new List<string>();
-            List<string> eth = new List<string>();
-            List<string> other = new List<string>();
-            try
-            {
-                foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
-                {
-                    if (ni.OperationalStatus != OperationalStatus.Up) continue;
-                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-                    foreach (UnicastIPAddressInformation ua in ni.GetIPProperties().UnicastAddresses)
-                    {
-                        if (ua.Address.AddressFamily != AddressFamily.InterNetwork) continue;
-                        string ip = ua.Address.ToString();
-                        if (ip.StartsWith("169.254")) continue;
-                        if (ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211) wifi.Add(ip);
-                        else if (ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet) eth.Add(ip);
-                        else other.Add(ip);
-                    }
-                }
-            }
-            catch { }
-            List<string> all = new List<string>();
-            all.AddRange(wifi);
-            all.AddRange(eth);
-            all.AddRange(other);
-            if (all.Count == 0) all.Add("127.0.0.1");
-            return all;
+            return LocalAddresses.Discover();
         }
 
         List<string> GetLocalIps()
@@ -1522,16 +1496,19 @@ namespace StroDeck
             List<string> ips = GetLocalIps();
             int port = server.Port;
             string url = "http://" + ips[0] + ":" + port + "/";
-            if (lblUrl.Text != url) lblUrl.Text = url;
+            string displayUrl = LocalAddresses.FormatDisplayUrl();
+            if (lblUrl.Text != displayUrl) lblUrl.Text = displayUrl;
 
-            string alt = "";
-            for (int i = 1; i < ips.Count; i++) alt += "   |   http://" + ips[i] + ":" + port + "/";
-            string sub = "Open this link on your tablet / smart display (same Wi-Fi)" + alt +
-                         "  ·  closing this window keeps it running in the tray";
+            bool localOnly = ips.Count == 1 && ips[0] == "127.0.0.1";
+            string sub = localOnly
+                ? "No LAN interface detected. The actual local URL can be copied, but is hidden here."
+                : "Actual URL is copied on request and used internally for casting; it is hidden here.";
+            sub += "  ·  closing this window keeps it running in the tray";
             if (lblSub.Text != sub) lblSub.Text = sub;
 
-            if (lblStatus.Text != "\u25CF Online") lblStatus.Text = "\u25CF Online";
-            lblStatus.ForeColor = Accent;
+            string status = localOnly ? "\u25CF Local only" : "\u25CF Online";
+            if (lblStatus.Text != status) lblStatus.Text = status;
+            lblStatus.ForeColor = localOnly ? Theme.Dim : Accent;
 
             if (caster != null)
             {
@@ -1553,7 +1530,7 @@ namespace StroDeck
             else
             {
                 lblUrl.Text = "Could not start server";
-                lblSub.Text = "Port busy? " + server.LastError;
+                lblSub.Text = "Could not start server: " + LocalAddresses.RedactIpv4(server.LastError);
                 lblStatus.Text = "\u25CF Offline";
                 lblStatus.ForeColor = Theme.Danger;
                 btnToggle.Text = "Start server";
@@ -1585,15 +1562,15 @@ namespace StroDeck
             {
                 string url = CurrentUrl();
                 Clipboard.SetText(url);
-                lblSub.Text = "Link copied: " + url;
+                lblSub.Text = "Current Stro-Deck URL copied; address hidden here.";
             }
-            catch { }
+            catch { lblSub.Text = "Could not copy the Stro-Deck URL."; }
         }
 
         void OpenUrl()
         {
             try { Process.Start(new ProcessStartInfo(CurrentUrl()) { UseShellExecute = true }); }
-            catch (Exception ex) { lblSub.Text = "Error: " + ex.Message; }
+            catch { lblSub.Text = "Could not open the Stro-Deck page."; }
         }
 
         void AllowFirewall()

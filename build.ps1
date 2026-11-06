@@ -12,6 +12,7 @@ $cscArgs = @(
     '/r:System.dll', '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll',
     "/resource:$PSScriptRoot\deck.html,deck.html",
     "$PSScriptRoot\Deck.cs",
+    "$PSScriptRoot\LocalAddresses.cs",
     "$PSScriptRoot\Ui.cs",
     "$PSScriptRoot\MainForm.cs",
     "$PSScriptRoot\Program.cs"

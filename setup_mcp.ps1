@@ -14,6 +14,16 @@ if ([string]::IsNullOrWhiteSpace($DeckUrl)) {
 if ([string]::IsNullOrWhiteSpace($HubIp) -or [string]::IsNullOrWhiteSpace($DeckUrl)) {
     throw "Both the Nest Hub IP address and Stro-Deck URL are required."
 }
+$parsedHubIp = $null
+if (-not [System.Net.IPAddress]::TryParse($HubIp, [ref]$parsedHubIp) -or
+    $parsedHubIp.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) {
+    throw "HubIp must be a valid IPv4 address."
+}
+$parsedDeckUrl = $null
+if (-not [Uri]::TryCreate($DeckUrl, [UriKind]::Absolute, [ref]$parsedDeckUrl) -or
+    $parsedDeckUrl.Scheme -notin @("http", "https")) {
+    throw "DeckUrl must be an absolute HTTP or HTTPS URL copied from the Stro-Deck app."
+}
 
 function ConvertTo-Hashtable {
     param($Value)
@@ -86,8 +96,7 @@ $json = $config | ConvertTo-Json -Depth 20
 [System.IO.File]::WriteAllText($configPath, $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
 
 Write-Host "MCP server configured:" -ForegroundColor Green
-Write-Host "  Hub IP: $HubIp"
-Write-Host "  Stro-Deck URL: $DeckUrl"
+Write-Host "  Hub and Stro-Deck address saved in the local MCP config."
 Write-Host "  Config: $configPath"
 Write-Host ""
 Write-Host "Restart or reload Antigravity's MCP servers, then run:" -ForegroundColor Cyan
