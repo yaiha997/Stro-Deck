@@ -8,6 +8,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -618,7 +619,16 @@ namespace StroDeck
         public int Port;
         public DeckConfig Config;
         public string LastError = "";
+        public string PairingCode { get; private set; }
         readonly byte[] html;
+        readonly Func<DeckButton, string> actionRunner;
+        readonly string secretPath;
+        byte[] authKey;
+        readonly object pairingLock = new object();
+        readonly Dictionary<string, int> pairingAttempts = new Dictionary<string, int>();
+        const string AuthCookie = "strodeck_session";
+        const int SessionLifetimeSeconds = 604800;
+        const int MaxPairingAttempts = 5;
 
         static readonly string Stamp = GetStamp();
 
@@ -629,10 +639,206 @@ namespace StroDeck
         }
 
         public DeckServer(int port, DeckConfig config)
+            : this(port, config, null, DefaultSecretPath(), null)
+        {
+        }
+
+        internal DeckServer(int port, DeckConfig config, Func<DeckButton, string> runner,
+            string keyPath, string pairingCode)
         {
             Port = port;
             Config = config;
             html = LoadHtml();
+            actionRunner = runner;
+            secretPath = keyPath;
+            PairingCode = pairingCode ?? GeneratePairingCode();
+        }
+
+        static string DefaultSecretPath()
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Stro-Deck", "server.key");
+        }
+
+        static string GeneratePairingCode()
+        {
+            byte[] bytes = new byte[4];
+            using (RandomNumberGenerator rng = RandomNumberGenerator.Create()) rng.GetBytes(bytes);
+            uint value = BitConverter.ToUInt32(bytes, 0) % 100000000U;
+            return value.ToString("D8", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        static byte[] LoadOrCreateKey(string path)
+        {
+            string directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+            try
+            {
+                using (FileStream stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    byte[] created = new byte[32];
+                    using (RandomNumberGenerator rng = RandomNumberGenerator.Create()) rng.GetBytes(created);
+                    stream.Write(created, 0, created.Length);
+                    stream.Flush(true);
+                    return created;
+                }
+            }
+            catch (IOException)
+            {
+                if (!File.Exists(path)) throw;
+                byte[] existing = File.ReadAllBytes(path);
+                if (existing.Length != 32) throw new InvalidDataException("The local authorization key is invalid.");
+                return existing;
+            }
+        }
+
+        static byte[] Hmac(byte[] key, byte[] data)
+        {
+            using (HMACSHA256 hmac = new HMACSHA256(key)) return hmac.ComputeHash(data);
+        }
+
+        static bool FixedTimeEquals(byte[] left, byte[] right)
+        {
+            if (left == null || right == null) return false;
+            int diff = left.Length ^ right.Length;
+            int length = Math.Max(left.Length, right.Length);
+            for (int i = 0; i < length; i++)
+            {
+                byte a = i < left.Length ? left[i] : (byte)0;
+                byte b = i < right.Length ? right[i] : (byte)0;
+                diff |= a ^ b;
+            }
+            return diff == 0;
+        }
+
+        static bool FixedTimeEquals(string left, string right)
+        {
+            using (SHA256 sha = SHA256.Create())
+                return FixedTimeEquals(sha.ComputeHash(Encoding.UTF8.GetBytes(left ?? "")),
+                    sha.ComputeHash(Encoding.UTF8.GetBytes(right ?? "")));
+        }
+
+        static string Base64Url(byte[] value)
+        {
+            return Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        }
+
+        static byte[] FromBase64Url(string value)
+        {
+            string s = value.Replace('-', '+').Replace('_', '/');
+            while (s.Length % 4 != 0) s += "=";
+            return Convert.FromBase64String(s);
+        }
+
+        string CreateSessionToken()
+        {
+            byte[] payload = new byte[40];
+            byte[] expiry = BitConverter.GetBytes(DateTime.UtcNow.AddSeconds(SessionLifetimeSeconds).Ticks);
+            Buffer.BlockCopy(expiry, 0, payload, 0, expiry.Length);
+            byte[] nonce = new byte[32];
+            using (RandomNumberGenerator rng = RandomNumberGenerator.Create())
+                rng.GetBytes(nonce);
+            Buffer.BlockCopy(nonce, 0, payload, 8, nonce.Length);
+            byte[] signature = Hmac(authKey, payload);
+            byte[] token = new byte[payload.Length + signature.Length];
+            Buffer.BlockCopy(payload, 0, token, 0, payload.Length);
+            Buffer.BlockCopy(signature, 0, token, payload.Length, signature.Length);
+            return Base64Url(token);
+        }
+
+        bool IsValidSession(string token)
+        {
+            if (string.IsNullOrEmpty(token)) return false;
+            try
+            {
+                byte[] value = FromBase64Url(token);
+                if (value.Length != 72) return false;
+                byte[] payload = new byte[40];
+                byte[] supplied = new byte[32];
+                Buffer.BlockCopy(value, 0, payload, 0, payload.Length);
+                Buffer.BlockCopy(value, payload.Length, supplied, 0, supplied.Length);
+                if (!FixedTimeEquals(Hmac(authKey, payload), supplied)) return false;
+                long expiryTicks = BitConverter.ToInt64(payload, 0);
+                return expiryTicks > DateTime.UtcNow.Ticks &&
+                    expiryTicks <= DateTime.UtcNow.AddSeconds(SessionLifetimeSeconds + 60).Ticks;
+            }
+            catch (FormatException) { return false; }
+            catch (ArgumentException) { return false; }
+        }
+
+        static string CookieValue(string cookieHeader)
+        {
+            if (string.IsNullOrEmpty(cookieHeader)) return null;
+            string[] cookies = cookieHeader.Split(';');
+            foreach (string cookie in cookies)
+            {
+                int equals = cookie.IndexOf('=');
+                if (equals > 0 && cookie.Substring(0, equals).Trim().Equals(AuthCookie, StringComparison.Ordinal))
+                    return cookie.Substring(equals + 1).Trim();
+            }
+            return null;
+        }
+
+        static string JsonString(string body, string property)
+        {
+            if (body == null) return null;
+            string key = "\"" + property + "\"";
+            int i = body.IndexOf(key, StringComparison.Ordinal);
+            if (i < 0) return null;
+            int c = body.IndexOf(':', i + key.Length);
+            if (c < 0) return null;
+            int q1 = body.IndexOf('"', c + 1);
+            if (q1 < 0) return null;
+            int q2 = body.IndexOf('"', q1 + 1);
+            if (q2 < 0) return null;
+            return body.Substring(q1 + 1, q2 - q1 - 1);
+        }
+
+        bool IsAllowedHost(string host, IPAddress localAddress)
+        {
+            if (string.IsNullOrEmpty(host) || host.IndexOf('@') >= 0) return false;
+            Uri uri;
+            if (!Uri.TryCreate("http://" + host + "/", UriKind.Absolute, out uri) ||
+                !string.IsNullOrEmpty(uri.UserInfo) || uri.Port != Port ||
+                uri.AbsolutePath != "/" || uri.Query.Length != 0 || uri.Fragment.Length != 0)
+                return false;
+
+            IPAddress address;
+            if (IPAddress.TryParse(uri.Host, out address))
+                return address.AddressFamily == AddressFamily.InterNetwork && address.Equals(localAddress);
+            return uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) &&
+                localAddress.Equals(IPAddress.Loopback);
+        }
+
+        bool IsSameOrigin(string origin, string host, IPAddress localAddress)
+        {
+            if (string.IsNullOrEmpty(origin)) return false;
+            Uri uri;
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out uri) ||
+                !uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
+                !string.IsNullOrEmpty(uri.UserInfo) || uri.Query.Length != 0 ||
+                uri.Fragment.Length != 0 || uri.AbsolutePath != "/")
+                return false;
+            Uri hostUri;
+            if (!Uri.TryCreate("http://" + host + "/", UriKind.Absolute, out hostUri)) return false;
+            return uri.Host.Equals(hostUri.Host, StringComparison.OrdinalIgnoreCase) &&
+                uri.Port == Port && hostUri.Port == Port && IsAllowedHost(host, localAddress);
+        }
+
+        bool AllowPairingAttempt(string remoteAddress, bool failedAttempt)
+        {
+            lock (pairingLock)
+            {
+                int attempts;
+                pairingAttempts.TryGetValue(remoteAddress, out attempts);
+                if (attempts >= MaxPairingAttempts) return false;
+                if (failedAttempt)
+                {
+                    if (attempts == 0 && pairingAttempts.Count >= 1024) return false;
+                    pairingAttempts[remoteAddress] = attempts + 1;
+                }
+                return true;
+            }
         }
 
         static byte[] LoadHtml()
@@ -657,6 +863,13 @@ namespace StroDeck
 
         public bool Start()
         {
+            try { authKey = LoadOrCreateKey(secretPath); }
+            catch (Exception ex)
+            {
+                LastError = "Could not initialize local authorization: " + ex.Message;
+                Running = false;
+                return false;
+            }
             for (int p = Port; p < Port + 20; p++)
             {
                 try
@@ -810,13 +1023,21 @@ namespace StroDeck
                     if (qi >= 0) path = path.Substring(0, qi);
 
                     int contentLength = 0;
+                    Dictionary<string, string> headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                     for (int i = 1; i < lines.Length; i++)
                     {
                         int c = lines[i].IndexOf(':');
                         if (c <= 0) continue;
-                        if (lines[i].Substring(0, c).Trim().Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+                        string name = lines[i].Substring(0, c).Trim();
+                        string value = lines[i].Substring(c + 1).Trim();
+                        headers[name] = value;
+                        if (name.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
                         {
-                            int.TryParse(lines[i].Substring(c + 1).Trim(), out contentLength);
+                            if (!int.TryParse(value, out contentLength) || contentLength < 0 || contentLength > 8192)
+                            {
+                                Send(ns, 413, "text/plain; charset=utf-8", Encoding.UTF8.GetBytes("request too large"));
+                                return;
+                            }
                         }
                     }
 
@@ -835,7 +1056,13 @@ namespace StroDeck
                         body = Encoding.UTF8.GetString(data, bodyStart, avail);
                     }
 
-                    if (method == "GET" && (path == "/" || path == "/index.html" || path == "/deck"))
+                    IPAddress localAddress = ((IPEndPoint)client.Client.LocalEndPoint).Address;
+                    string host = headers.ContainsKey("Host") ? headers["Host"] : null;
+                    if (!IsAllowedHost(host, localAddress))
+                    {
+                        Send(ns, 403, "text/plain; charset=utf-8", Encoding.UTF8.GetBytes("invalid host"));
+                    }
+                    else if (method == "GET" && (path == "/" || path == "/index.html" || path == "/deck"))
                     {
                         Send(ns, 200, "text/html; charset=utf-8", html);
                     }
@@ -843,19 +1070,71 @@ namespace StroDeck
                     {
                         Send(ns, 200, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(StateJson()));
                     }
+                    else if (method == "POST" && path == "/api/pair")
+                    {
+                        if (!headers.ContainsKey("Origin") ||
+                            !IsSameOrigin(headers["Origin"], host, localAddress))
+                        {
+                            Send(ns, 403, "application/json; charset=utf-8",
+                                Encoding.UTF8.GetBytes("{\"ok\":false,\"msg\":\"Pairing requires the same origin\"}"));
+                        }
+                        else if (!headers.ContainsKey("Content-Type") ||
+                            !headers["Content-Type"].StartsWith("application/json", StringComparison.OrdinalIgnoreCase))
+                        {
+                            Send(ns, 400, "application/json; charset=utf-8",
+                                Encoding.UTF8.GetBytes("{\"ok\":false,\"msg\":\"Expected JSON\"}"));
+                        }
+                        else
+                        {
+                            string remoteAddress = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
+                            string code = JsonString(body, "code");
+                            bool validCode = FixedTimeEquals(code, PairingCode);
+                            if (!AllowPairingAttempt(remoteAddress, !validCode) || !validCode)
+                            {
+                                Send(ns, 403, "application/json; charset=utf-8",
+                                    Encoding.UTF8.GetBytes("{\"ok\":false,\"msg\":\"Invalid or unavailable pairing code\"}"));
+                            }
+                            else
+                            {
+                                string token = CreateSessionToken();
+                                string cookie = AuthCookie + "=" + token +
+                                    "; Path=/; Max-Age=" + SessionLifetimeSeconds +
+                                    "; HttpOnly; SameSite=Strict";
+                                Send(ns, 200, "application/json; charset=utf-8",
+                                    Encoding.UTF8.GetBytes("{\"ok\":true}"), cookie);
+                            }
+                        }
+                    }
                     else if (method == "POST" && path == "/api/press")
                     {
-                        string id = JsonId(body);
-                        int idx;
-                        bool ok = false;
-                        string msg = "Unknown button";
-                        if (id != null && int.TryParse(id, out idx) && idx >= 0 && idx < Config.Buttons.Count)
+                        string token = headers.ContainsKey("Cookie") ? CookieValue(headers["Cookie"]) : null;
+                        if (!headers.ContainsKey("Origin") ||
+                            !IsSameOrigin(headers["Origin"], host, localAddress) ||
+                            !IsValidSession(token))
                         {
-                            msg = Runner.Run(Config.Buttons[idx]);
-                            ok = !msg.StartsWith("Error") && !msg.StartsWith("Unknown action") && !msg.StartsWith("No ");
+                            Send(ns, 403, "application/json; charset=utf-8",
+                                Encoding.UTF8.GetBytes("{\"ok\":false,\"msg\":\"Pair this browser with the desktop app\"}"));
                         }
-                        string json = "{\"ok\":" + (ok ? "true" : "false") + ",\"msg\":\"" + Esc(msg) + "\"}";
-                        Send(ns, 200, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json));
+                        else if (!headers.ContainsKey("Content-Type") ||
+                            !headers["Content-Type"].StartsWith("application/json", StringComparison.OrdinalIgnoreCase))
+                        {
+                            Send(ns, 400, "application/json; charset=utf-8",
+                                Encoding.UTF8.GetBytes("{\"ok\":false,\"msg\":\"Expected JSON\"}"));
+                        }
+                        else
+                        {
+                            string id = JsonId(body);
+                            int idx;
+                            bool ok = false;
+                            string msg = "Unknown button";
+                            if (id != null && int.TryParse(id, out idx) && idx >= 0 && idx < Config.Buttons.Count)
+                            {
+                                msg = actionRunner != null ? actionRunner(Config.Buttons[idx]) : Runner.Run(Config.Buttons[idx]);
+                                ok = !msg.StartsWith("Error") && !msg.StartsWith("Unknown action") && !msg.StartsWith("No ");
+                            }
+                            string json = "{\"ok\":" + (ok ? "true" : "false") + ",\"msg\":\"" + Esc(msg) + "\"}";
+                            Send(ns, 200, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json));
+                        }
                     }
                     else if (method == "GET" && path == "/api/ping")
                     {
@@ -895,7 +1174,10 @@ namespace StroDeck
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LastError = "Request failed: " + ex.GetType().Name;
+            }
         }
 
         static string MimeFor(string fileName)
@@ -917,16 +1199,27 @@ namespace StroDeck
 
         static void Send(NetworkStream ns, int code, string contentType, byte[] body)
         {
+            Send(ns, code, contentType, body, null);
+        }
+
+        static void Send(NetworkStream ns, int code, string contentType, byte[] body, string setCookie)
+        {
             string status;
             if (code == 200) status = "OK";
+            else if (code == 400) status = "Bad Request";
+            else if (code == 401) status = "Unauthorized";
+            else if (code == 403) status = "Forbidden";
             else if (code == 404) status = "Not Found";
+            else if (code == 413) status = "Payload Too Large";
             else status = "Error";
             StringBuilder h = new StringBuilder();
             h.Append("HTTP/1.1 ").Append(code).Append(' ').Append(status).Append("\r\n");
             h.Append("Content-Type: ").Append(contentType).Append("\r\n");
             h.Append("Content-Length: ").Append(body.Length).Append("\r\n");
             h.Append("Cache-Control: no-store\r\n");
-            h.Append("Access-Control-Allow-Origin: *\r\n");
+            h.Append("X-Content-Type-Options: nosniff\r\n");
+            h.Append("Referrer-Policy: no-referrer\r\n");
+            if (!string.IsNullOrEmpty(setCookie)) h.Append("Set-Cookie: ").Append(setCookie).Append("\r\n");
             h.Append("Connection: close\r\n\r\n");
             byte[] head = Encoding.ASCII.GetBytes(h.ToString());
             ns.Write(head, 0, head.Length);

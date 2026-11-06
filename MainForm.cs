@@ -1500,7 +1500,8 @@ namespace StroDeck
             if (lblUrl.Text != displayUrl) lblUrl.Text = displayUrl;
 
             bool localOnly = ips.Count == 1 && ips[0] == "127.0.0.1";
-            string sub = localOnly
+            string sub = "Pair code: " + server.PairingCode + "  ·  ";
+            sub += localOnly
                 ? "No LAN interface detected. The actual local URL can be copied, but is hidden here."
                 : "Actual URL is copied on request and used internally for casting; it is hidden here.";
             sub += "  ·  closing this window keeps it running in the tray";
@@ -1544,6 +1545,7 @@ namespace StroDeck
                 server.Stop();
                 if (caster != null) caster.Enabled = false;
                 lblUrl.Text = "Server stopped";
+                lblSub.Text = "Server stopped.";
                 lblStatus.Text = "\u25CF Offline";
                 lblStatus.ForeColor = Theme.Dim;
                 btnToggle.Text = "Start server";
@@ -1562,7 +1564,7 @@ namespace StroDeck
             {
                 string url = CurrentUrl();
                 Clipboard.SetText(url);
-                lblSub.Text = "Current Stro-Deck URL copied; address hidden here.";
+                lblSub.Text = "Current URL copied; pair code: " + (server != null ? server.PairingCode : "start server");
             }
             catch { lblSub.Text = "Could not copy the Stro-Deck URL."; }
         }
@@ -1576,7 +1578,7 @@ namespace StroDeck
         void AllowFirewall()
         {
             string args = "advfirewall firewall add rule name=\"Stro-Deck\" dir=in action=allow program=\"" +
-                          Application.ExecutablePath + "\" enable=yes profile=any";
+                          Application.ExecutablePath + "\" protocol=TCP localport=8090-8109 enable=yes profile=private";
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo("netsh", args);

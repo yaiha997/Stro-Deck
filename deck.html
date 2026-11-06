@@ -71,6 +71,17 @@
   .offline{position:fixed;top:0;left:0;right:0;height:3px;background:#ff5252;
     box-shadow:0 0 12px #ff5252;opacity:0;transition:opacity .3s;z-index:10}
   .offline.show{opacity:1}
+  .pair-panel{position:fixed;inset:0;z-index:8;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.94);text-align:center}
+  .pair-panel[hidden]{display:none}
+  .pair-panel h1{font-size:clamp(24px,5vw,40px);margin:0 0 12px}
+  .pair-panel p{max-width:440px;color:#c7c7ce;line-height:1.5}
+  .pair-panel form{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .pair-panel input,.pair-panel button{min-height:48px;border-radius:10px;font:inherit}
+  .pair-panel input{width:190px;padding:8px 14px;border:1px solid #555;color:#fff;background:#151519;
+    text-align:center;letter-spacing:.18em;user-select:text;-webkit-user-select:text}
+  .pair-panel button{padding:8px 18px;border:0;background:#39ff14;color:#071006;font-weight:700}
+  #pairMessage{min-height:1.5em;color:#ffb4b4}
 </style>
 </head>
 <body>
@@ -79,6 +90,16 @@
   <div class="clock" id="clock"><span id="clockTime">--:--</span><span class="ap" id="clockAp"></span></div>
 </header>
 <main class="deck" id="deck"></main>
+<section class="pair-panel" id="pairPanel" hidden>
+  <h1>Pair this browser</h1>
+  <p>Enter the 8-digit pairing code shown in Stro-Deck on the computer. This browser will remember the pairing for 7 days.</p>
+  <form id="pairForm">
+    <input id="pairCode" type="password" inputmode="numeric" autocomplete="one-time-code"
+      maxlength="8" pattern="[0-9]{8}" placeholder="8-digit code" aria-label="8-digit pairing code" required>
+    <button type="submit">Pair device</button>
+  </form>
+  <p id="pairMessage" role="status"></p>
+</section>
 <div class="toast" id="toast"></div>
 <script>
 (function () {
@@ -89,6 +110,10 @@
   var clockFormat = '24';
   var toastEl = document.getElementById('toast');
   var offlineEl = document.getElementById('offline');
+  var pairPanel = document.getElementById('pairPanel');
+  var pairForm = document.getElementById('pairForm');
+  var pairCode = document.getElementById('pairCode');
+  var pairMessage = document.getElementById('pairMessage');
   var state = null;
   var toastTimer = null;
 
@@ -114,6 +139,37 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { toastEl.className = 'toast ' + (ok ? 'ok' : 'err'); }, 1900);
   }
+
+  function showPairing(message) {
+    pairPanel.hidden = false;
+    deck.style.visibility = 'hidden';
+    pairMessage.textContent = message || '';
+  }
+
+  function loadAuthorized() {
+    pairPanel.hidden = true;
+    deck.style.visibility = '';
+    load();
+  }
+
+  pairForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    pairMessage.textContent = '';
+    fetch('/api/pair', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ code: pairCode.value })
+    }).then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok || !j.ok) throw new Error(j.msg || 'Pairing failed');
+        pairCode.value = '';
+        loadAuthorized();
+      });
+    }).catch(function (err) {
+      showPairing(err.message || 'Pairing failed');
+    });
+  });
 
   /* deterministic "scatter" so the layout is stable but not a rigid grid */
   function scatter(i) {
@@ -206,8 +262,14 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: b.id })
-    }).then(function (r) { return r.json(); })
-      .then(function (j) {
+    }).then(function (r) {
+      return r.json().then(function (j) { return { response: r, body: j }; });
+    }).then(function (result) {
+        if (result.response.status === 403) {
+          showPairing(result.body.msg || 'Pair this browser with the desktop app.');
+          return;
+        }
+        var j = result.body;
         toast(j.msg || (j.ok ? 'OK' : 'Error'), !!j.ok);
         offlineEl.className = 'offline';
       })
