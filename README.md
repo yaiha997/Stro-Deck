@@ -2,6 +2,22 @@
 
 Stro-Deck turns a Windows computer into a customizable remote control. It runs a small web server on the computer and serves a button grid to a browser on another device on the same local network. Configure buttons in the desktop app; pressing a button in the browser performs its configured action on the Windows computer.
 
+## Screenshots
+
+The desktop app configures the deck, while the Nest Hub displays its browser-based button grid.
+
+<p align="center">
+  <img src="docs/images/stro-deck-on-nest-hub.jpg" alt="Stro-Deck running on a Google Nest Hub" width="760">
+  <br>
+  <em>Stro-Deck displayed on a Google Nest Hub.</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/stro-deck-desktop-app.png" alt="Stro-Deck desktop app and button editor" width="760">
+  <br>
+  <em>Desktop app showing the server address, casting status, button layout, and selected button settings.</em>
+</p>
+
 ## Requirements
 
 - Windows
