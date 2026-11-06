@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Windows.Forms;
+using System.Text.RegularExpressions;
 
 namespace StroDeck
 {
@@ -35,7 +36,9 @@ namespace StroDeck
                         {
                             System.IO.File.AppendAllText(
                                 System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "error.log"),
-                                DateTime.Now.ToString("u") + "  " + e.Exception + Environment.NewLine);
+                                    DateTime.Now.ToString("u") + "  " +
+                                    Regex.Replace(e.Exception.ToString(), @"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)", "[IPv4]") +
+                                    Environment.NewLine);
                         }
                         catch { }
                     };

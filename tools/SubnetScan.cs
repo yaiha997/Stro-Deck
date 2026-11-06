@@ -11,7 +11,7 @@ class SubnetScan
 
     static void Main(string[] args)
     {
-        prefix = args[0];              // e.g. 192.168.68.
+        prefix = args[0];              // e.g. 192.0.2. (documentation-only range)
         port = int.Parse(args[1]);
         timeout = args.Length > 2 ? int.Parse(args[2]) : 400;
         Thread[] ts = new Thread[64];

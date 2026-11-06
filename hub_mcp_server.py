@@ -9,8 +9,8 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Stro-Deck Nest Hub")
 
-HUB_IP = os.environ.get("STRO_DECK_HUB_IP", "192.168.68.102").strip()
-DEFAULT_URL = os.environ.get("STRO_DECK_URL", "http://127.0.0.1:8090/").strip()
+HUB_IP = os.environ.get("STRO_DECK_HUB_IP", "").strip()
+DEFAULT_URL = os.environ.get("STRO_DECK_URL", "").strip()
 
 
 def find_catt():
@@ -66,7 +66,10 @@ async def run_catt(args):
 @mcp.tool()
 async def cast_site(url: str = "") -> str:
     """Cast a web page or site (like Stro-Deck) to Google Nest Hub."""
-    return await run_catt(["cast_site", url.strip() or DEFAULT_URL])
+    target = url.strip() or DEFAULT_URL
+    if not target:
+        return "Error: Configure STRO_DECK_URL with the current address shown by the Stro-Deck app, or pass a URL."
+    return await run_catt(["cast_site", target])
 
 
 @mcp.tool()
