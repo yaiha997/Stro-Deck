@@ -1,45 +1,99 @@
+import asyncio
 import os
-import sys
+from pathlib import Path
+import shutil
 import subprocess
+import sys
+
 from mcp.server.fastmcp import FastMCP
 
-# Initialize FastMCP Server for Google Nest Hub
-mcp = FastMCP("Google-Nest-Hub-Controller")
+mcp = FastMCP("Stro-Deck Nest Hub")
 
-HUB_IP = "192.168.68.102"
-CATT_PATH = r"C:\Users\pc\AppData\Local\Programs\Python\Python312\Scripts\catt.exe"
+HUB_IP = os.environ.get("STRO_DECK_HUB_IP", "192.168.68.102").strip()
+DEFAULT_URL = os.environ.get("STRO_DECK_URL", "http://127.0.0.1:8090/").strip()
 
-def run_catt(args):
+
+def find_catt():
+    configured = os.environ.get("STRO_DECK_CATT_PATH")
+    if configured:
+        return configured
+
+    installed = shutil.which("catt")
+    if installed:
+        return installed
+
+    python_dir = Path(sys.executable).resolve().parent
+    for candidate in (python_dir / "Scripts" / "catt.exe", python_dir / "catt.exe"):
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+async def run_catt(args):
+    catt_path = find_catt()
+    if not catt_path:
+        return "Error: catt was not found. Run setup_mcp.ps1 to install and configure it."
+    if not HUB_IP:
+        return "Error: Set STRO_DECK_HUB_IP to the Nest Hub IP address."
+
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
-    cmd = [CATT_PATH, "-d", HUB_IP] + args
-    result = subprocess.run(cmd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    return result.stdout.strip() if result.returncode == 0 else f"Error: {result.stderr.strip()}"
+    cmd = [catt_path, "-d", HUB_IP] + args
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        return f"Error: catt executable not found: {catt_path}"
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.communicate()
+        return "Error: catt did not respond within 30 seconds."
+
+    output = stdout.decode("utf-8", errors="replace").strip()
+    if process.returncode == 0:
+        return output or "Command completed successfully."
+    error = stderr.decode("utf-8", errors="replace").strip() or output or f"catt exited with code {process.returncode}."
+    return f"Error: {error}"
+
 
 @mcp.tool()
-def cast_site(url: str = "http://192.168.68.108:8090/") -> str:
+async def cast_site(url: str = "") -> str:
     """Cast a web page or site (like Stro-Deck) to Google Nest Hub."""
-    return run_catt(["cast_site", url])
+    return await run_catt(["cast_site", url.strip() or DEFAULT_URL])
+
 
 @mcp.tool()
-def stop_cast() -> str:
-    """Stop currently active cast / site on Nest Hub."""
-    return run_catt(["stop"])
+async def stop_cast() -> str:
+    """Stop currently active Cast session on the Nest Hub."""
+    return await run_catt(["stop"])
+
 
 @mcp.tool()
-def play_media(url: str) -> str:
-    """Play YouTube or media URL on Nest Hub."""
-    return run_catt(["cast", url])
+async def play_media(url: str) -> str:
+    """Play a supported media URL on the Nest Hub."""
+    return await run_catt(["cast", url])
+
 
 @mcp.tool()
-def set_volume(level: int) -> str:
-    """Set volume level on Nest Hub (0 - 100)."""
-    return run_catt(["volume", str(level)])
+async def set_volume(level: int) -> str:
+    """Set Nest Hub volume to a value from 0 to 100."""
+    if level < 0 or level > 100:
+        return "Error: level must be between 0 and 100."
+    return await run_catt(["volume", str(level)])
+
 
 @mcp.tool()
-def hub_status() -> str:
-    """Get current status and playback state of Google Nest Hub."""
-    return run_catt(["status"])
+async def hub_status() -> str:
+    """Get current Google Cast status and playback state from the Nest Hub."""
+    return await run_catt(["status"])
+
 
 if __name__ == "__main__":
     mcp.run()

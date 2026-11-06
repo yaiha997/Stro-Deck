@@ -74,28 +74,21 @@ This is the simplest way to show the Stro-Deck web page on the Hub.
 
 1. Connect the computer and Hub to the same local network. Make sure the Hub can reach the computer's IP address and Stro-Deck's active port.
 2. Start `Stro-Deck.exe`. Use the address shown by the app, for example `http://<computer-ip>:8090/`. If port 8090 is busy, the app may use another port through 8109.
-3. Install Python, `catt`, and the MCP Python package in the environment you will use to run the server. For example:
+3. Open PowerShell in the Stro-Deck folder and run the setup command. Replace these example addresses with the Hub IP and full Stro-Deck URL from your network:
 
    ```powershell
-   py -m pip install catt mcp
+   powershell -ExecutionPolicy Bypass -File .\setup_mcp.ps1 -HubIp 192.168.1.20 -DeckUrl http://192.168.1.8:8090/
    ```
 
-4. Open `hub_mcp_server.py` and set `HUB_IP` to the Hub's IP address. Set `CATT_PATH` to the full path of the `catt.exe` installed in your Python environment. The `catt` command must be able to reach the Hub.
-5. Add an MCP server entry to Antigravity's MCP configuration. Replace both example paths with the actual Python executable and script paths on your computer:
+4. Restart Antigravity or reload its MCP servers. The server runs over standard input/output; you do not need to keep a separate terminal window open.
+5. To verify the setup safely from PowerShell, run:
 
-   ```json
-   {
-     "mcpServers": {
-       "google-nest-hub": {
-         "command": "C:\\Path\\To\\Python\\python.exe",
-         "args": ["C:\\Path\\To\\Stro-Deck\\hub_mcp_server.py"]
-       }
-     }
-   }
+   ```powershell
+   py -3 .\test_mcp_stdio.py
    ```
 
-6. Save the MCP configuration and restart or reload the MCP server in Antigravity. The server communicates over standard input/output; its Python process must remain available while Antigravity is using its tools.
-7. Ask the MCP client to call `cast_site` with the Stro-Deck URL, such as `http://<computer-ip>:8090/`. Open that same URL on a phone or tablet on the local network if you need to tap buttons; ordinary Cast display does not forward touch input back to Stro-Deck.
+   The setup script installs compatible dependencies and adds `stro-deck-nest-hub` to Antigravity's MCP configuration at `%USERPROFILE%\.gemini\config\mcp_config.json`, preserving other MCP servers. The sandbox test starts a real MCP stdio client and server, checks all five tools, and tests status and volume calls against a temporary fake `catt` command. It does not send test commands to the Hub. The sandbox test requires the .NET Framework C# compiler, which is included with Windows .NET Framework.
+6. In Antigravity, call `hub_status` to verify the real Hub connection. To display Stro-Deck, call `cast_site` with no arguments (uses the URL configured during setup) or pass the page URL explicitly. Open that same URL on a phone or tablet if you need to tap the buttons; ordinary Cast display does not forward touch input back to Stro-Deck.
 
 The MCP tools in `hub_mcp_server.py` are:
 
@@ -107,7 +100,7 @@ The MCP tools in `hub_mcp_server.py` are:
 | `set_volume` | `level` from 0 to 100 | Changes the Hub volume using `catt volume` |
 | `hub_status` | None | Gets the Hub's current Cast/playback status |
 
-In plain terms, Antigravity starts the Python MCP server; the MCP server translates a tool call into a local `catt` command; `catt` sends the Cast request to the Hub. This MCP server does not inspect Fuchsia internals or use Chrome DevTools. Its Hub IP and `catt.exe` path are currently configured in the Python file, so update them for your own computer before starting it.
+In plain terms, Antigravity starts the Python MCP server; the MCP server translates a tool call into a local `catt` command; `catt` sends the Cast request to the Hub. This MCP server does not inspect Fuchsia internals or use Chrome DevTools. The setup command stores the Hub IP, Stro-Deck URL, and `catt.exe` path in Antigravity's MCP configuration, and the server reads them from its environment.
 
 ### Option B: Use Fuchsia WebView remote debugging
 
