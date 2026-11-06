@@ -1,6 +1,6 @@
-# Stream Deck PC
+# Stro-Deck
 
-Stream Deck PC turns a Windows computer into a customizable remote control. It runs a small web server on the computer and serves a button grid to a browser on another device on the same local network. Configure buttons in the desktop app; pressing a button in the browser performs its configured action on the Windows computer.
+Stro-Deck turns a Windows computer into a customizable remote control. It runs a small web server on the computer and serves a button grid to a browser on another device on the same local network. Configure buttons in the desktop app; pressing a button in the browser performs its configured action on the Windows computer.
 
 ## Requirements
 
@@ -12,7 +12,7 @@ Stream Deck PC turns a Windows computer into a customizable remote control. It r
 
 ## Run the application
 
-1. Start `StreamDeckPC.exe`.
+1. Start `Stro-Deck.exe`.
 2. The desktop app displays the address to use, for example `http://192.168.1.8:8090/`.
 3. Open that address in a browser on the other device. Both devices must be on the same reachable network.
 4. If Windows Firewall prompts you, allow the app on your trusted private network.
@@ -68,12 +68,12 @@ This button launches OpenCode in the existing project folder; it does not create
 
 There are two different ways to use the Hub with this project. The MCP server controls Google Cast playback; the Fuchsia WebView scripts inspect or navigate a debuggable WebView. They are separate tools, and enabling WebView debugging is not required for casting.
 
-### Option A: Cast Stream Deck with the MCP server
+### Option A: Cast Stro-Deck with the MCP server
 
-This is the simplest way to show the Stream Deck web page on the Hub.
+This is the simplest way to show the Stro-Deck web page on the Hub.
 
-1. Connect the computer and Hub to the same local network. Make sure the Hub can reach the computer's IP address and Stream Deck's active port.
-2. Start `StreamDeckPC.exe`. Use the address shown by the app, for example `http://<computer-ip>:8090/`. If port 8090 is busy, the app may use another port through 8109.
+1. Connect the computer and Hub to the same local network. Make sure the Hub can reach the computer's IP address and Stro-Deck's active port.
+2. Start `Stro-Deck.exe`. Use the address shown by the app, for example `http://<computer-ip>:8090/`. If port 8090 is busy, the app may use another port through 8109.
 3. Install Python, `catt`, and the MCP Python package in the environment you will use to run the server. For example:
 
    ```powershell
@@ -88,14 +88,14 @@ This is the simplest way to show the Stream Deck web page on the Hub.
      "mcpServers": {
        "google-nest-hub": {
          "command": "C:\\Path\\To\\Python\\python.exe",
-         "args": ["C:\\Path\\To\\StreamDeck\\hub_mcp_server.py"]
+         "args": ["C:\\Path\\To\\Stro-Deck\\hub_mcp_server.py"]
        }
      }
    }
    ```
 
 6. Save the MCP configuration and restart or reload the MCP server in Antigravity. The server communicates over standard input/output; its Python process must remain available while Antigravity is using its tools.
-7. Ask the MCP client to call `cast_site` with the Stream Deck URL, such as `http://<computer-ip>:8090/`. Open that same URL on a phone or tablet on the local network if you need to tap buttons; ordinary Cast display does not forward touch input back to Stream Deck.
+7. Ask the MCP client to call `cast_site` with the Stro-Deck URL, such as `http://<computer-ip>:8090/`. Open that same URL on a phone or tablet on the local network if you need to tap buttons; ordinary Cast display does not forward touch input back to Stro-Deck.
 
 The MCP tools in `hub_mcp_server.py` are:
 
@@ -122,13 +122,13 @@ Use this method only if the Hub exposes a debuggable WebView. It is a separate, 
    ```
 
    The script checks whether the Hub responds to ping, probes a list of TCP ports, and queries `/json/version` and `/json/list` on ports 9222 and 9223 when available. Ping can be blocked even when a TCP port is reachable.
-4. If a DevTools target is listed, use `hub-push.ps1` to connect to the target's WebSocket debugging endpoint and navigate it to the Stream Deck page:
+4. If a DevTools target is listed, use `hub-push.ps1` to connect to the target's WebSocket debugging endpoint and navigate it to the Stro-Deck page:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\hub-push.ps1 -Ip <hub-ip> -Port 9222 -Url http://<computer-ip>:8090/
    ```
 
-   Use the computer's actual address and the port currently shown by Stream Deck. The helper lists available targets, selects the first page target (or the first target if no page is listed), enables the Page domain, and sends a `Page.navigate` request. The `-List` switch lists targets and exits without navigating:
+   Use the computer's actual address and the port currently shown by Stro-Deck. The helper lists available targets, selects the first page target (or the first target if no page is listed), enables the Page domain, and sends a `Page.navigate` request. The `-List` switch lists targets and exits without navigating:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\hub-push.ps1 -Ip <hub-ip> -Port 9222 -List
@@ -138,7 +138,7 @@ The Hub must expose a target with a `webSocketDebuggerUrl`; otherwise the script
 
 ### Troubleshooting
 
-- **The Hub cannot load the page:** Confirm Stream Deck is running, use its current IP and port, and check Windows Firewall and local-network access.
+- **The Hub cannot load the page:** Confirm Stro-Deck is running, use its current IP and port, and check Windows Firewall and local-network access.
 - **`catt` cannot find or control the Hub:** Verify the Hub IP in `hub_mcp_server.py`, install `catt` in the selected Python environment, and point `CATT_PATH` to that environment's `catt.exe`.
 - **The MCP tools do not appear in Antigravity:** Check the JSON configuration paths, ensure the MCP Python package is installed in the configured Python environment, then reload the MCP server and inspect its startup errors.
 - **No DevTools targets appear:** Confirm WebView remote debugging is enabled and that the Hub exposes port 9222 or 9223. Casting a page does not itself enable WebView debugging.
@@ -151,13 +151,13 @@ Run this from PowerShell in the project directory:
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-The build script compiles `Deck.cs`, `Ui.cs`, `MainForm.cs`, and `Program.cs`, embeds `deck.html`, and produces `StreamDeckPC.exe`. Rebuild after changing source code or the page.
+The build script compiles `Deck.cs`, `Ui.cs`, `MainForm.cs`, and `Program.cs`, embeds `deck.html`, and produces `Stro-Deck.exe`. Rebuild after changing source code or the page.
 
 ## Project files
 
 | File or directory | Purpose |
 |---|---|
-| `StreamDeckPC.exe` | Windows desktop app and local web server |
+| `Stro-Deck.exe` | Windows desktop app and local web server |
 | `Deck.cs` | Configuration, action execution, HTTP server, and casting logic |
 | `MainForm.cs`, `Ui.cs`, `Program.cs` | Desktop editor and application startup |
 | `deck.html` | Remote browser interface |

@@ -14,7 +14,7 @@ using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-namespace StreamDeckPC
+namespace StroDeck
 {
     internal class MainForm : Form
     {
@@ -61,7 +61,7 @@ namespace StreamDeckPC
         DateTime ipCacheAt = DateTime.MinValue;
 
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        const string RunName = "StreamDeckPC";
+        const string RunName = "Stro-Deck";
 
         [DllImport("user32.dll")]
         static extern bool ReleaseCapture();
@@ -110,7 +110,7 @@ namespace StreamDeckPC
             }
             startHidden = trayArg || cfg.StartInTray;
 
-            Text = "Stream Deck PC";
+            Text = "Stro-Deck";
             BackColor = Bg;
             ForeColor = Fg;
             Font = new Font("Segoe UI", 9f);
@@ -209,7 +209,7 @@ namespace StreamDeckPC
             title.Font = new Font("Segoe UI", 10.5f, FontStyle.Bold);
             title.ForeColor = Fg;
             title.BackColor = Color.Transparent;
-            title.Text = "Stream Deck PC";
+            title.Text = "Stro-Deck";
             bar.Controls.Add(title);
 
             Label subtitle = new Label();
@@ -800,7 +800,7 @@ namespace StreamDeckPC
 
             tray = new NotifyIcon();
             tray.Icon = appIcon;
-            tray.Text = "Stream Deck PC";
+            tray.Text = "Stro-Deck";
             tray.Visible = true;
             tray.ContextMenuStrip = trayMenu;
             tray.MouseClick += delegate(object s, MouseEventArgs e)
@@ -848,7 +848,7 @@ namespace StreamDeckPC
 
             if (tray != null)
             {
-                string tip = "Stream Deck PC";
+                string tip = "Stro-Deck";
                 if (server != null && server.Running) tip += "  ·  Online";
                 if (cfg.CastOn) tip += "  ·  Cast " + st;
                 if (tip.Length > 63) tip = tip.Substring(0, 63);
@@ -862,7 +862,7 @@ namespace StreamDeckPC
             tipShown = true;
             try
             {
-                tray.ShowBalloonTip(3000, "Stream Deck PC",
+                tray.ShowBalloonTip(3000, "Stro-Deck",
                     "Running in the background. Click the tray icon to open the editor.", ToolTipIcon.Info);
             }
             catch { }
@@ -1000,7 +1000,7 @@ namespace StreamDeckPC
             try
             {
                 string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-                string lnk = Path.Combine(desktop, "Stream Deck PC.lnk");
+                string lnk = Path.Combine(desktop, "Stro-Deck.lnk");
                 Type shellType = Type.GetTypeFromProgID("WScript.Shell");
                 if (shellType == null) throw new Exception("WScript.Shell unavailable");
                 shell = Activator.CreateInstance(shellType);
@@ -1009,7 +1009,7 @@ namespace StreamDeckPC
                 st.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { Application.ExecutablePath });
                 st.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { AppDomain.CurrentDomain.BaseDirectory });
                 st.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { Application.ExecutablePath + ",0" });
-                st.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { "Stream Deck PC control center" });
+                st.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { "Stro-Deck control center" });
                 st.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
                 if (!quiet && lblResult != null) lblResult.Text = "Desktop shortcut created";
             }
@@ -1598,7 +1598,7 @@ namespace StreamDeckPC
 
         void AllowFirewall()
         {
-            string args = "advfirewall firewall add rule name=\"Stream Deck PC\" dir=in action=allow program=\"" +
+            string args = "advfirewall firewall add rule name=\"Stro-Deck\" dir=in action=allow program=\"" +
                           Application.ExecutablePath + "\" enable=yes profile=any";
             try
             {

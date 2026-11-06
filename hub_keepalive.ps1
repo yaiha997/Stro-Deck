@@ -9,7 +9,7 @@ while ($true) {
     try {
         $status = & $catt -d $ip status 2>$null
         # If not playing or returned to ambient/idle screen, recast
-        if ($status -notmatch "Casting" -and $status -notmatch "Stream Deck") {
+        if ($status -notmatch "Casting" -and $status -notmatch "Stro-Deck") {
             Write-Host "Re-casting to ensure screen stays forever..." -ForegroundColor Yellow
             & $catt -d $ip cast_site $url 2>$null
         }

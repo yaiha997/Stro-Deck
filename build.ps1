@@ -3,10 +3,7 @@ $ErrorActionPreference = 'Stop'
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path $csc)) { throw "csc.exe not found: $csc" }
 
-$out = Join-Path $PSScriptRoot 'StreamDeckPC.exe'
-
-# stop a running copy so the file is not locked
-Get-Process StreamDeckPC -ErrorAction SilentlyContinue | Stop-Process -Force
+$out = Join-Path $PSScriptRoot 'Stro-Deck.exe'
 
 $icon = Join-Path $PSScriptRoot 'app.ico'
 $cscArgs = @(

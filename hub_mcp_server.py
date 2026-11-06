@@ -18,7 +18,7 @@ def run_catt(args):
 
 @mcp.tool()
 def cast_site(url: str = "http://192.168.68.108:8090/") -> str:
-    """Cast a web page or site (like Stream Deck) to Google Nest Hub."""
+    """Cast a web page or site (like Stro-Deck) to Google Nest Hub."""
     return run_catt(["cast_site", url])
 
 @mcp.tool()

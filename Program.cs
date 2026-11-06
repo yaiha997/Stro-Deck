@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace StreamDeckPC
+namespace StroDeck
 {
     internal static class Program
     {
@@ -10,13 +10,13 @@ namespace StreamDeckPC
         static void Main()
         {
             bool created;
-            using (Mutex m = new Mutex(true, "StreamDeckPC_single_instance", out created))
+            using (Mutex m = new Mutex(true, "Stro-Deck_single_instance", out created))
             {
                 if (!created)
                 {
                     try
                     {
-                        using (EventWaitHandle show = EventWaitHandle.OpenExisting("StreamDeckPC_show"))
+                        using (EventWaitHandle show = EventWaitHandle.OpenExisting("Stro-Deck_show"))
                         {
                             show.Set();
                         }
@@ -25,7 +25,7 @@ namespace StreamDeckPC
                     return;
                 }
 
-                using (EventWaitHandle show = new EventWaitHandle(false, EventResetMode.AutoReset, "StreamDeckPC_show"))
+                using (EventWaitHandle show = new EventWaitHandle(false, EventResetMode.AutoReset, "Stro-Deck_show"))
                 {
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);

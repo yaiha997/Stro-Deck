@@ -12,7 +12,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace StreamDeckPC
+namespace StroDeck
 {
     internal class DeckButton
     {
@@ -27,7 +27,7 @@ namespace StreamDeckPC
     {
         public int Cols = 4;
         public int Rows = 3;
-        public string Title = "STREAM DECK";
+        public string Title = "STRO-DECK";
         public string Background = "";
         public string BackgroundPos = "center";
         public string ClockStyle = "bold";
@@ -152,7 +152,7 @@ namespace StreamDeckPC
         {
             c.Normalize();
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine("# Stream Deck PC config (edited by the app)");
+            sb.AppendLine("# Stro-Deck config (edited by the app)");
             sb.AppendLine("cols=" + c.Cols.ToString(CultureInfo.InvariantCulture));
             sb.AppendLine("rows=" + c.Rows.ToString(CultureInfo.InvariantCulture));
             sb.AppendLine("title=" + B64E(c.Title));

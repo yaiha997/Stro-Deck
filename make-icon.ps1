@@ -1,4 +1,4 @@
-# Builds app.ico (multi-size, PNG encoded) for Stream Deck PC.
+# Builds app.ico (multi-size, PNG encoded) for Stro-Deck.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
