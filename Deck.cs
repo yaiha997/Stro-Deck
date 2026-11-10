@@ -72,7 +72,7 @@ namespace StroDeck
                 Btn("Prev",       "\u23EE\uFE0F", "#BA68C8", "media",      "prev"),
                 Btn("Vol +",      "\U0001F50A", "#F06292", "media",        "volup"),
                 Btn("Vol -",      "\U0001F509", "#F06292", "media",        "voldown"),
-                Btn("Screenshot", "\U0001F4F8", "#4DB6AC", "key",          "win+shift+s")
+                Btn("Spotify",    "img:icon_20261106_105745_944.png", "#81C784", "app", "spotify:")
             });
             return c;
         }
@@ -618,6 +618,7 @@ namespace StroDeck
         public volatile bool Running;
         public int Port;
         public DeckConfig Config;
+        public NowPlaying Now;
         public string LastError = "";
         public string PairingCode { get; private set; }
         readonly byte[] html;
@@ -648,6 +649,7 @@ namespace StroDeck
         {
             Port = port;
             Config = config;
+            Now = new NowPlaying();
             html = LoadHtml();
             actionRunner = runner;
             secretPath = keyPath;
@@ -879,6 +881,7 @@ namespace StroDeck
                     listener = l;
                     Port = p;
                     Running = true;
+                    if (Now != null) Now.Start();
                     thread = new Thread(AcceptLoop);
                     thread.IsBackground = true;
                     thread.Start();
@@ -896,6 +899,7 @@ namespace StroDeck
         public void Stop()
         {
             Running = false;
+            if (Now != null) Now.Stop();
             try { if (listener != null) listener.Stop(); }
             catch { }
         }
@@ -988,6 +992,14 @@ namespace StroDeck
             int q2 = body.IndexOf('"', q1 + 1);
             if (q2 < 0) return null;
             return body.Substring(q1 + 1, q2 - q1 - 1);
+        }
+
+        bool IsAuthorizedAction(Dictionary<string, string> headers, string host, IPAddress localAddress)
+        {
+            string token = headers.ContainsKey("Cookie") ? CookieValue(headers["Cookie"]) : null;
+            return headers.ContainsKey("Origin") &&
+                IsSameOrigin(headers["Origin"], host, localAddress) &&
+                IsValidSession(token);
         }
 
         void Handle(object state)
@@ -1107,10 +1119,7 @@ namespace StroDeck
                     }
                     else if (method == "POST" && path == "/api/press")
                     {
-                        string token = headers.ContainsKey("Cookie") ? CookieValue(headers["Cookie"]) : null;
-                        if (!headers.ContainsKey("Origin") ||
-                            !IsSameOrigin(headers["Origin"], host, localAddress) ||
-                            !IsValidSession(token))
+                        if (!IsAuthorizedAction(headers, host, localAddress))
                         {
                             Send(ns, 403, "application/json; charset=utf-8",
                                 Encoding.UTF8.GetBytes("{\"ok\":false,\"msg\":\"Pair this browser with the desktop app\"}"));
@@ -1129,11 +1138,72 @@ namespace StroDeck
                             string msg = "Unknown button";
                             if (id != null && int.TryParse(id, out idx) && idx >= 0 && idx < Config.Buttons.Count)
                             {
-                                msg = actionRunner != null ? actionRunner(Config.Buttons[idx]) : Runner.Run(Config.Buttons[idx]);
+                                DeckButton button = Config.Buttons[idx];
+                                if (actionRunner != null)
+                                    msg = actionRunner(button);
+                                else if (button.Action == "media" &&
+                                    (button.Target == "play" || button.Target == "next" || button.Target == "prev"))
+                                    msg = Now.Control(button.Target == "play" ? "toggle" : button.Target)
+                                        ? "Media control sent" : "No active media session";
+                                else
+                                    msg = Runner.Run(button);
                                 ok = !msg.StartsWith("Error") && !msg.StartsWith("Unknown action") && !msg.StartsWith("No ");
                             }
                             string json = "{\"ok\":" + (ok ? "true" : "false") + ",\"msg\":\"" + Esc(msg) + "\"}";
                             Send(ns, 200, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(json));
+                        }
+                    }
+                    else if (method == "GET" && path == "/api/now")
+                    {
+                        string token = headers.ContainsKey("Cookie") ? CookieValue(headers["Cookie"]) : null;
+                        if (!IsValidSession(token))
+                            Send(ns, 403, "application/json; charset=utf-8", Encoding.UTF8.GetBytes("{\"on\":0}"));
+                        else
+                            Send(ns, 200, "application/json; charset=utf-8", Encoding.UTF8.GetBytes(Now.Json()));
+                    }
+                    else if (method == "GET" && path == "/api/cover")
+                    {
+                        string token = headers.ContainsKey("Cookie") ? CookieValue(headers["Cookie"]) : null;
+                        if (!IsValidSession(token))
+                        {
+                            Send(ns, 403, "text/plain; charset=utf-8", Encoding.UTF8.GetBytes("Pair this browser"));
+                        }
+                        else
+                        {
+                            byte[] cover = Now.CoverBytes;
+                            if (cover == null || cover.Length == 0)
+                                Send(ns, 404, "text/plain; charset=utf-8", Encoding.UTF8.GetBytes("no cover"));
+                            else
+                                Send(ns, 200, Now.CoverMime, cover);
+                        }
+                    }
+                    else if (method == "POST" && path == "/api/media")
+                    {
+                        if (!IsAuthorizedAction(headers, host, localAddress))
+                        {
+                            Send(ns, 403, "application/json; charset=utf-8",
+                                Encoding.UTF8.GetBytes("{\"ok\":false,\"msg\":\"Pair this browser with the desktop app\"}"));
+                        }
+                        else if (!headers.ContainsKey("Content-Type") ||
+                            !headers["Content-Type"].StartsWith("application/json", StringComparison.OrdinalIgnoreCase))
+                        {
+                            Send(ns, 400, "application/json; charset=utf-8",
+                                Encoding.UTF8.GetBytes("{\"ok\":false,\"msg\":\"Expected JSON\"}"));
+                        }
+                        else
+                        {
+                            string command = JsonString(body, "cmd");
+                            if (command != "toggle" && command != "next" && command != "prev")
+                            {
+                                Send(ns, 400, "application/json; charset=utf-8",
+                                    Encoding.UTF8.GetBytes("{\"ok\":false,\"msg\":\"Unknown media command\"}"));
+                            }
+                            else
+                            {
+                                bool ok = Now.Control(command);
+                                Send(ns, 200, "application/json; charset=utf-8",
+                                    Encoding.UTF8.GetBytes("{\"ok\":" + (ok ? "true" : "false") + "}"));
+                            }
                         }
                     }
                     else if (method == "GET" && path == "/api/ping")

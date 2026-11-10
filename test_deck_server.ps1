@@ -12,6 +12,7 @@ try {
     & $compiler /nologo /target:exe "/out:$testExecutable" `
         /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll `
         (Join-Path $PSScriptRoot "Deck.cs") `
+        (Join-Path $PSScriptRoot "NowPlaying.cs") `
         (Join-Path $PSScriptRoot "tests\DeckServerTests.cs")
     if ($LASTEXITCODE -ne 0) { throw "Deck-server test build failed ($LASTEXITCODE)." }
 

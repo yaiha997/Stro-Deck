@@ -137,7 +137,6 @@ namespace StroDeck
             SetupTray();
             StartServer();
             UpdateCastStatus();
-            CreateDesktopShortcut(true);
 
             netTimer = new System.Windows.Forms.Timer();
             netTimer.Interval = 30000;
@@ -1247,7 +1246,7 @@ namespace StroDeck
                     lblHint.Text = "Examples:  https://youtube.com   |   https://chat.openai.com";
                     break;
                 case "cmd":
-                    lblHint.Text = "Examples:  explorer C:\\Users\\pc\\Desktop   |   start spotify";
+                    lblHint.Text = "Examples:  explorer %USERPROFILE%\\Desktop   |   start spotify";
                     break;
                 case "powershell":
                     lblHint.Text = "Runs hidden.  Example:  Stop-Process -Name notepad   |   (New-Object -ComObject WScript.Shell).SendKeys([char]175)";
