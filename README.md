@@ -4,6 +4,18 @@
 
 Stro-Deck turns a Windows computer into a customizable remote control. It runs a small web server on the computer and serves a button grid to a browser on another device on the same local network. Configure buttons in the desktop app; pressing a button in the browser performs its configured action on the Windows computer.
 
+## Share Stro-Deck
+
+<p align="center">
+  <a href="docs/images/stro-deck-promo-1200x630.svg">
+    <img src="docs/images/stro-deck-promo-1200x630.svg" alt="Stro-Deck: a customizable Windows deck for apps, Spotify and media controls, and smart displays" width="760">
+  </a>
+  <br>
+  <a href="docs/images/stro-deck-promo-1200x630.svg">Wide graphic (1200 × 630)</a> ·
+  <a href="docs/images/stro-deck-promo-square.svg">Square graphic</a> ·
+  <a href="docs/promotion.md">Copy-ready English and Arabic posts</a>
+</p>
+
 ## Screenshots
 
 <p align="center">
