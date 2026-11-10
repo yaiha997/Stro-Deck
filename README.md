@@ -30,17 +30,17 @@ The desktop app configures the deck, while the Nest Hub displays its browser-bas
 
 1. Start `Stro-Deck.exe`.
 2. The desktop app discovers the computer's active IPv4 addresses but shows only a privacy-safe placeholder such as `http://<computer-ip>:8090/`. Select **Copy link** to copy the current usable URL; the app uses that real URL internally for opening and casting without displaying the IP.
-3. Open that address in a browser on the other device. Both devices must be on the same reachable network.
+3. Open that address in a browser on the other device. The deck can be displayed without pairing; when a browser first presses a button, enter the 8-digit pairing code shown in the desktop app. The browser keeps an HttpOnly session cookie for seven days.
 4. If Windows Firewall prompts you, allow the app on your trusted private network.
 
-The server listens on port 8090 by default and tries the next 19 ports if that port is unavailable. The computer's address is discovered at runtime and is not saved to the app configuration or rendered in the desktop UI. If there is no usable LAN address, the app indicates that only a local URL is available.
+The server listens on port 8090 by default and tries the next 19 ports if that port is unavailable. It must remain reachable on LAN interfaces for phones, tablets, and the Nest Hub; the app validates request Host and Origin values and requires pairing for actions. The computer's address is discovered at runtime and is not saved to the app configuration or rendered in the desktop UI. If there is no usable LAN address, the app indicates that only a local URL is available.
 
 ## How it works
 
 1. `Program.cs` starts the Windows Forms desktop application.
 2. `MainForm.cs` provides the button editor, server controls, and configuration persistence.
 3. `Deck.cs` loads the deck settings, runs the local HTTP server, and dispatches button actions.
-4. `deck.html` is embedded into the executable and rendered by the remote device's browser. The page requests the current deck state from `/api/state` and sends button presses to `/api/press`.
+4. `deck.html` is embedded into the executable and rendered by the remote device's browser. The page requests display state from `/api/state` and sends paired button presses to `/api/press`.
 5. Button actions run on the Windows computer. They can open apps and websites, run CMD or PowerShell commands, send keyboard/media input, type text, or perform power actions.
 
 The configuration is stored in `deck-config.txt` beside the executable and is managed by the desktop app. The app creates default buttons when no configuration exists.
@@ -105,8 +105,8 @@ This is the simplest way to show the Stro-Deck web page on the Hub.
    py -3 .\test_mcp_stdio.py
    ```
 
-   Run the local address-selection checks with `powershell -ExecutionPolicy Bypass -File .\test_network_selection.ps1`. The setup script installs compatible dependencies and adds `stro-deck-nest-hub` to Antigravity's MCP configuration at `%USERPROFILE%\.gemini\config\mcp_config.json`, preserving other MCP servers. The MCP sandbox test uses a temporary fake `catt` command and sends no commands to the Hub; both test scripts require the .NET Framework C# compiler included with Windows .NET Framework.
-6. In Antigravity, call `hub_status` to verify the real Hub connection. To display Stro-Deck, call `cast_site` with no arguments (uses the URL configured during setup) or pass the page URL explicitly. Open that same URL on a phone or tablet if you need to tap the buttons; ordinary Cast display does not forward touch input back to Stro-Deck.
+   Run the local address-selection checks with `powershell -ExecutionPolicy Bypass -File .\test_network_selection.ps1` and the HTTP authorization checks with `powershell -ExecutionPolicy Bypass -File .\test_deck_server.ps1`. The setup script installs compatible dependencies and adds `stro-deck-nest-hub` to Antigravity's MCP configuration at `%USERPROFILE%\.gemini\config\mcp_config.json`, preserving other MCP servers. The MCP sandbox test uses a temporary fake `catt` command and sends no commands to the Hub; the C# test scripts require the .NET Framework C# compiler included with Windows .NET Framework.
+6. In Antigravity, call `hub_status` to verify the real Hub connection. To display Stro-Deck, call `cast_site` with no arguments (uses the URL configured during setup) or pass the page URL explicitly. The Hub can display the deck without pairing. Open that same URL on a phone or tablet if you need to tap the buttons; the first button press prompts for the code shown in the Stro-Deck desktop app. Ordinary Cast display does not forward touch input back to Stro-Deck.
 
 The MCP tools in `hub_mcp_server.py` are:
 
@@ -188,6 +188,8 @@ The build script compiles the C# sources, including runtime address discovery, e
 
 ## Security
 
-The local web server does not require authentication, and button actions execute on the Windows computer. Only run the app on a trusted network and do not expose its port to the public internet.
+Button actions require a same-origin request and a paired browser session. Pairing uses the 8-digit code visible in the desktop app while the server is running; failed pairing attempts are limited to five per remote IP for that run. A random 32-byte signing key is stored under `%LOCALAPPDATA%\Stro-Deck\server.key` and is never placed in the page, URL, or app configuration. A successful pairing grants that browser a seven-day HttpOnly, SameSite=Strict cookie. The cookie is a bearer capability held by the browser (including a Hub browser if it is paired), though page JavaScript cannot read it. The pairing code changes when the server restarts, while existing cookies remain valid for up to seven days. To revoke all existing cookies, stop the app, remove `server.key`, and restart it so a new key is created.
+
+The listener remains bound to all IPv4 interfaces so other devices can load the deck. Host validation, pairing, same-origin checks, and removal of wildcard CORS reduce exposure, but they do not make an untrusted network safe: HTTP is unencrypted, so a capable local-network attacker could observe pairing traffic or steal a session cookie. Keep the port on a trusted private network, do not forward it from the internet, and only configure actions you intend to run as your Windows user. The app's **Allow firewall** button adds a TCP rule for ports 8090–8109 on the Private profile only; verify Windows Firewall policy and avoid enabling access on Public networks.
 
 The app's current LAN address is displayed only while it is running; it is not written to the tracked app settings or error log. Error-log IPv4 values are redacted. The included screenshots use redacted address fields. Device-specific Hub addresses may still be present in your own local MCP configuration, so keep that file private.
