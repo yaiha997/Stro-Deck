@@ -16,7 +16,8 @@ $cscArgs = @(
     "$PSScriptRoot\NowPlaying.cs",
     "$PSScriptRoot\Ui.cs",
     "$PSScriptRoot\MainForm.cs",
-    "$PSScriptRoot\Program.cs"
+    "$PSScriptRoot\Program.cs",
+    "$PSScriptRoot\Version.cs"
 )
 if (Test-Path $icon) { $cscArgs += "/win32icon:$icon" }
 
