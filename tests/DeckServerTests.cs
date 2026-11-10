@@ -19,6 +19,12 @@ namespace StroDeck
             try
             {
                 int port = FindPort();
+                DeckConfig defaults = DeckConfig.Defaults();
+                Assert(defaults.Buttons.Exists(delegate(DeckButton button)
+                {
+                    return button.Label == "Spotify" && button.Action == "app" && button.Target == "spotify:";
+                }), "the default deck includes a Spotify launch tile");
+
                 DeckConfig config = new DeckConfig();
                 config.Buttons.Add(new DeckButton { Label = "Test", Action = "test" });
                 server = new DeckServer(port, config, RunTestAction,
@@ -106,6 +112,41 @@ namespace StroDeck
                     null, null, "");
                 Assert(publicState.Status == 200,
                     "the read-only deck state remains available to a display without pairing");
+
+                Response publicNowPlaying = Request(server.Port, "GET", "/api/now", host, null,
+                    null, null, "");
+                Assert(publicNowPlaying.Status == 403,
+                    "now-playing metadata is not exposed without pairing");
+
+                Response publicCover = Request(server.Port, "GET", "/api/cover", host, null,
+                    null, null, "");
+                Assert(publicCover.Status == 403,
+                    "media artwork is not exposed without pairing");
+
+                Response unauthorizedMedia = Request(server.Port, "POST", "/api/media", host, origin,
+                    null, "application/json", "{\"cmd\":\"next\"}");
+                Assert(unauthorizedMedia.Status == 403,
+                    "media controls require a paired same-origin session");
+
+                Response mediaWithoutOrigin = Request(server.Port, "POST", "/api/media", host, null,
+                    cookiePair, "application/json", "{\"cmd\":\"next\"}");
+                Assert(mediaWithoutOrigin.Status == 403,
+                    "a valid cookie cannot authorize media controls without a same-origin request");
+
+                Response invalidMedia = Request(server.Port, "POST", "/api/media", host, origin,
+                    cookiePair, "application/json", "{\"cmd\":\"launch\"}");
+                Assert(invalidMedia.Status == 400,
+                    "unknown media commands are rejected");
+
+                Response pairedNowPlaying = Request(server.Port, "GET", "/api/now", host, null,
+                    cookiePair, null, "");
+                Assert(pairedNowPlaying.Status == 200,
+                    "paired browsers can read now-playing metadata");
+
+                Response pairedCover = Request(server.Port, "GET", "/api/cover", host, null,
+                    cookiePair, null, "");
+                Assert(pairedCover.Status == 200 || pairedCover.Status == 404,
+                    "paired browsers can read artwork or receive the no-cover response");
 
                 Console.WriteLine("All deck-server authorization checks passed.");
                 return 0;

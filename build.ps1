@@ -13,15 +13,25 @@ $cscArgs = @(
     "/resource:$PSScriptRoot\deck.html,deck.html",
     "$PSScriptRoot\Deck.cs",
     "$PSScriptRoot\LocalAddresses.cs",
+    "$PSScriptRoot\NowPlaying.cs",
     "$PSScriptRoot\Ui.cs",
     "$PSScriptRoot\MainForm.cs",
-    "$PSScriptRoot\Program.cs"
+    "$PSScriptRoot\Program.cs",
+    "$PSScriptRoot\Version.cs"
 )
 if (Test-Path $icon) { $cscArgs += "/win32icon:$icon" }
 
 & $csc @cscArgs
 
 if ($LASTEXITCODE -ne 0) { throw "Build failed ($LASTEXITCODE)" }
+
+$winrtCandidates = @(
+    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\System.Runtime.WindowsRuntime.dll'),
+    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\System.Runtime.WindowsRuntime.dll')
+)
+$winrt = $winrtCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $winrt) { throw "System.Runtime.WindowsRuntime.dll was not found in the .NET Framework installation." }
+Copy-Item -LiteralPath $winrt -Destination (Join-Path $PSScriptRoot 'System.Runtime.WindowsRuntime.dll') -Force
 
 Write-Host ""
 Write-Host "Built: $out" -ForegroundColor Green

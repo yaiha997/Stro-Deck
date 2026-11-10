@@ -82,14 +82,70 @@
     text-align:center;letter-spacing:.18em;user-select:text;-webkit-user-select:text}
   .pair-panel button{padding:8px 18px;border:0;background:#39ff14;color:#071006;font-weight:700}
   #pairMessage{min-height:1.5em;color:#ffb4b4}
+  .now{position:absolute;left:50%;top:7px;transform:translateX(-50%);z-index:4;display:none;
+    align-items:center;gap:10px;width:min(430px,calc(100vw - 210px));height:44px;padding:5px 12px;
+    color:#fff;text-align:left;font:inherit;cursor:pointer;overflow:hidden;border:1px solid rgba(255,255,255,.3);
+    border-radius:15px;background:rgba(20,35,39,.72);backdrop-filter:blur(20px) saturate(170%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 22px rgba(0,0,0,.24)}
+  .now.show{display:flex}
+  .now-art{width:32px;height:32px;flex:none;object-fit:cover;border-radius:8px;background:#24242b}
+  .now-meta{display:flex;flex-direction:column;min-width:0;flex:1}
+  .now-title,.now-artist{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .now-title{font-size:14px;font-weight:650}
+  .now-artist{font-size:11px;color:rgba(255,255,255,.68)}
+  .player{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+    padding:24px;color:#fff;background:radial-gradient(110% 100% at 50% 0%,#343728,#11120f 65%,#080909)}
+  .player.open{display:flex}
+  .player-inner{display:flex;align-items:center;gap:clamp(24px,5vw,56px);width:min(980px,100%)}
+  .player-art{width:min(48vw,52vh);aspect-ratio:1;flex:none;object-fit:cover;border-radius:22px;
+    background:#202027;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+  .player-meta{min-width:0;flex:1}
+  .player-kicker{font-size:11px;font-weight:700;letter-spacing:.28em;color:#ff725f}
+  .player-title{margin-top:12px;font-size:clamp(28px,5vh,48px);font-weight:700;line-height:1.1}
+  .player-artist{margin-top:9px;color:rgba(255,255,255,.68)}
+  .player-album{margin-top:4px;color:rgba(255,255,255,.48);font-size:13px}
+  .player-progress{height:4px;margin-top:26px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden}
+  .player-progress i{display:block;width:0;height:100%;background:#ff725f}
+  .player-times{display:flex;justify-content:space-between;margin-top:7px;color:rgba(255,255,255,.55);font-size:11px}
+  .player-controls{display:flex;align-items:center;gap:16px;margin-top:23px}
+  .player-controls button,.player-close{width:48px;height:48px;border:1px solid rgba(255,255,255,.25);
+    border-radius:50%;color:#fff;background:rgba(255,255,255,.1);font:inherit;font-size:19px;cursor:pointer}
+  .player-controls .primary{width:60px;height:60px;border-color:#ff725f;font-size:22px}
+  .player-close{position:absolute;right:22px;bottom:22px;font-size:23px}
+  body.player-open .deck,body.player-open header{visibility:hidden}
+  @media(max-width:650px){.now{width:calc(100vw - 160px)}.player-inner{flex-direction:column;gap:20px;text-align:center}
+    .player-art{width:min(45vh,72vw)}.player-meta{width:100%}.player-controls{justify-content:center}}
 </style>
 </head>
 <body>
 <div class="offline" id="offline"></div>
 <header id="hdr">
   <div class="clock" id="clock"><span id="clockTime">--:--</span><span class="ap" id="clockAp"></span></div>
+  <button class="now" id="now" type="button" aria-label="Open now playing">
+    <img class="now-art" id="nowArt" alt="">
+    <span class="now-meta"><span class="now-title" id="nowTitle"></span><span class="now-artist" id="nowArtist"></span></span>
+  </button>
 </header>
 <main class="deck" id="deck"></main>
+<section class="player" id="player" aria-hidden="true">
+  <div class="player-inner">
+    <img class="player-art" id="playerArt" alt="">
+    <div class="player-meta">
+      <div class="player-kicker">NOW PLAYING</div>
+      <div class="player-title" id="playerTitle"></div>
+      <div class="player-artist" id="playerArtist"></div>
+      <div class="player-album" id="playerAlbum"></div>
+      <div class="player-progress"><i id="playerBar"></i></div>
+      <div class="player-times"><span id="playerPosition">0:00</span><span id="playerDuration">0:00</span></div>
+      <div class="player-controls">
+        <button id="playerPrev" type="button" aria-label="Previous track">|◀</button>
+        <button id="playerToggle" class="primary" type="button" aria-label="Play or pause">▶</button>
+        <button id="playerNext" type="button" aria-label="Next track">▶|</button>
+      </div>
+    </div>
+  </div>
+  <button class="player-close" id="playerClose" type="button" aria-label="Close player">×</button>
+</section>
 <section class="pair-panel" id="pairPanel" hidden>
   <h1>Pair this browser</h1>
   <p>Enter the 8-digit pairing code shown in Stro-Deck on the computer. This browser will remember the pairing for 7 days.</p>
@@ -116,6 +172,25 @@
   var pairMessage = document.getElementById('pairMessage');
   var state = null;
   var toastTimer = null;
+  var nowData = null;
+  var lastCover = -1;
+  var playerOpen = false;
+  var nowEl = document.getElementById('now');
+  var playerEl = document.getElementById('player');
+
+  var playerNodes = {
+    nowArt: document.getElementById('nowArt'),
+    nowTitle: document.getElementById('nowTitle'),
+    nowArtist: document.getElementById('nowArtist'),
+    art: document.getElementById('playerArt'),
+    title: document.getElementById('playerTitle'),
+    artist: document.getElementById('playerArtist'),
+    album: document.getElementById('playerAlbum'),
+    bar: document.getElementById('playerBar'),
+    position: document.getElementById('playerPosition'),
+    duration: document.getElementById('playerDuration'),
+    toggle: document.getElementById('playerToggle')
+  };
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function tick() {
@@ -141,6 +216,7 @@
   }
 
   function showPairing(message) {
+    closePlayer();
     pairPanel.hidden = false;
     deck.style.visibility = 'hidden';
     pairMessage.textContent = message || '';
@@ -150,6 +226,7 @@
     pairPanel.hidden = true;
     deck.style.visibility = '';
     load();
+    loadNow();
   }
 
   pairForm.addEventListener('submit', function (e) {
@@ -279,6 +356,97 @@
       })
       .then(function () { setTimeout(function () { busy = false; }, 220); });
   }
+
+  function formatTime(seconds) {
+    seconds = Math.max(0, Math.floor(Number(seconds) || 0));
+    return Math.floor(seconds / 60) + ':' + pad(seconds % 60);
+  }
+
+  function closePlayer() {
+    playerOpen = false;
+    playerEl.classList.remove('open');
+    playerEl.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('player-open');
+  }
+
+  function updateProgress() {
+    if (!nowData) return;
+    var duration = Number(nowData.end) || 0;
+    var position = Number(nowData.pos) || 0;
+    playerNodes.bar.style.width = duration > 0 ? Math.max(0, Math.min(100, position / duration * 100)) + '%' : '0%';
+    playerNodes.position.textContent = formatTime(position);
+    playerNodes.duration.textContent = formatTime(duration);
+  }
+
+  function applyNow(data) {
+    nowData = data;
+    if (!data || data.on !== 1 || !data.title) {
+      nowEl.classList.remove('show');
+      if (playerOpen) closePlayer();
+      return;
+    }
+
+    nowEl.classList.add('show');
+    playerNodes.nowTitle.textContent = data.title;
+    playerNodes.nowArtist.textContent = data.artist || '';
+    playerNodes.title.textContent = data.title;
+    playerNodes.artist.textContent = data.artist || '';
+    playerNodes.album.textContent = data.album || '';
+    playerNodes.toggle.textContent = data.playing === 1 ? 'Ⅱ' : '▶';
+    if (data.cover !== lastCover) {
+      lastCover = data.cover;
+      var coverUrl = '/api/cover?v=' + encodeURIComponent(data.cover);
+      [playerNodes.nowArt, playerNodes.art].forEach(function (image) {
+        image.style.visibility = 'visible';
+        image.onerror = function () { image.style.visibility = 'hidden'; };
+        image.src = coverUrl;
+      });
+    }
+    updateProgress();
+  }
+
+  function loadNow() {
+    fetch('/api/now', { cache: 'no-store' }).then(function (response) {
+      return response.json();
+    }).then(applyNow).catch(function () {});
+  }
+
+  function sendMedia(command) {
+    fetch('/api/media', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd: command })
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        if (response.status === 403) {
+          showPairing(data.msg || 'Pair this browser with the desktop app.');
+          return;
+        }
+        setTimeout(loadNow, 300);
+      });
+    }).catch(function () {});
+  }
+
+  nowEl.addEventListener('click', function () {
+    if (!nowData || nowData.on !== 1) return;
+    playerOpen = true;
+    playerEl.classList.add('open');
+    playerEl.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('player-open');
+    updateProgress();
+  });
+  document.getElementById('playerClose').addEventListener('click', closePlayer);
+  document.getElementById('playerToggle').addEventListener('click', function () { sendMedia('toggle'); });
+  document.getElementById('playerPrev').addEventListener('click', function () { sendMedia('prev'); });
+  document.getElementById('playerNext').addEventListener('click', function () { sendMedia('next'); });
+  setInterval(function () {
+    if (playerOpen && nowData && nowData.playing === 1 && nowData.end > nowData.pos) {
+      nowData.pos += 1;
+      updateProgress();
+    }
+  }, 1000);
+  loadNow();
+  setInterval(loadNow, 2000);
 
   var lastJson = '';
   function load() {

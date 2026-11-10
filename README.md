@@ -1,28 +1,37 @@
 # Stro-Deck
 
+**Version 1.0.1**
+
 Stro-Deck turns a Windows computer into a customizable remote control. It runs a small web server on the computer and serves a button grid to a browser on another device on the same local network. Configure buttons in the desktop app; pressing a button in the browser performs its configured action on the Windows computer.
 
 ## Screenshots
 
-The desktop app configures the deck, while the Nest Hub displays its browser-based button grid.
-
-<p align="center">
-  <img src="docs/images/stro-deck-on-nest-hub.jpg" alt="Stro-Deck running on a Google Nest Hub" width="760">
-  <br>
-  <em>Stro-Deck displayed on a Google Nest Hub.</em>
-</p>
-
 <p align="center">
   <img src="docs/images/stro-deck-desktop-app.png" alt="Stro-Deck desktop app and button editor" width="760">
   <br>
-  <em>Desktop app showing redacted address placeholders, casting status, button layout, and selected button settings.</em>
+  <em>Configure buttons, appearance, pairing, and optional startup behavior in the Windows app.</em>
 </p>
+
+<p align="center">
+  <img src="docs/images/spotify-deck-controls.jpg" alt="Stro-Deck deck with Spotify launch and media controls" width="760">
+  <br>
+  <em>Open Spotify and control the active media session from the same touch-friendly deck.</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/spotify-now-playing.jpg" alt="Stro-Deck now-playing overlay with album artwork and transport controls" width="760">
+  <br>
+  <em>Tap the now-playing banner to see artwork, track details, progress, and playback controls.</em>
+</p>
+
+Try Stro-Deck and share your setup: **#Windows #Spotify #SmartHome #OpenSource #NestHub**
 
 ## Requirements
 
 - Windows
 - A phone, tablet, or other browser-enabled device on the same local network
-- Windows PowerShell and the .NET Framework C# compiler (`csc.exe`) to rebuild from source
+- Windows PowerShell and .NET Framework 4.x to run the app
+- The .NET Framework C# compiler (`csc.exe`) to rebuild from source
 - Optional: Google Nest Hub with WebView remote debugging enabled
 - Optional: OpenCode and Windows Terminal for the Greeting project launcher described below
 
@@ -30,10 +39,16 @@ The desktop app configures the deck, while the Nest Hub displays its browser-bas
 
 1. Start `Stro-Deck.exe`.
 2. The desktop app discovers the computer's active IPv4 addresses but shows only a privacy-safe placeholder such as `http://<computer-ip>:8090/`. Select **Copy link** to copy the current usable URL; the app uses that real URL internally for opening and casting without displaying the IP.
-3. Open that address in a browser on the other device. The deck can be displayed without pairing; when a browser first presses a button, enter the 8-digit pairing code shown in the desktop app. The browser keeps an HttpOnly session cookie for seven days.
+3. Open that address in a browser on the other device. The deck can be displayed without pairing; press a button once and enter the 8-digit pairing code shown in the desktop app. The browser keeps an HttpOnly session cookie for seven days.
 4. If Windows Firewall prompts you, allow the app on your trusted private network.
 
 The server listens on port 8090 by default and tries the next 19 ports if that port is unavailable. It must remain reachable on LAN interfaces for phones, tablets, and the Nest Hub; the app validates request Host and Origin values and requires pairing for actions. The computer's address is discovered at runtime and is not saved to the app configuration or rendered in the desktop UI. If there is no usable LAN address, the app indicates that only a local URL is available.
+
+### Spotify and media controls
+
+Stro-Deck reads the active Windows media session, preferring Spotify when it is available. The deck can show the track, artist, album artwork, and playback progress; tap the now-playing banner to open the larger player and use play/pause, previous, and next. The default deck also includes a Spotify launch tile and media buttons. Install and sign in to Spotify separately; playback metadata and control availability depend on Spotify exposing a Windows media session. Other media apps that use Windows media controls can also appear when Spotify is not active.
+
+Pair each browser before accessing track details, album artwork, or playback controls. The desktop app and server continue to work when no media session is active.
 
 ## How it works
 
@@ -162,18 +177,30 @@ Run this from PowerShell in the project directory:
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-The build script compiles the C# sources, including runtime address discovery, embeds `deck.html`, and produces `Stro-Deck.exe`. Rebuild after changing source code or the page.
+The build script compiles the C# sources, including runtime address discovery and Windows media-session support, embeds `deck.html`, and copies the .NET Windows Runtime interop assembly required by the media reader. Rebuild after changing source code or the page.
+
+### Create a Windows installer
+
+Install Inno Setup 6, then run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-installer.ps1
+```
+
+The script rebuilds the app and compiles `installer\Stro-Deck.iss` into `installer\output\Stro-Deck-Setup.exe`. The installer is per-user and does not require administrator access. Desktop and Start menu shortcuts are available, and the unchecked **Start Stro-Deck when I sign in to Windows** task opts into launching in the system tray. The tray menu can also enable startup or **Start in background** later. Uninstall removes the app and its startup entry; user-created configuration and image files are retained.
 
 ## Project files
 
 | File or directory | Purpose |
 |---|---|
 | `Stro-Deck.exe` | Windows desktop app and local web server |
-| `Deck.cs` | Configuration, action execution, HTTP server, and casting logic |
+| `Deck.cs` | Configuration, action execution, protected media API, HTTP server, and casting logic |
+| `NowPlaying.cs` | Windows media-session metadata and transport controls |
 | `MainForm.cs`, `Ui.cs`, `Program.cs` | Desktop editor and application startup |
 | `deck.html` | Remote browser interface |
 | `deck-config.txt` | Sanitized sample app configuration; the app's live network address is not stored here |
 | `build.ps1` | Source build script |
+| `build-installer.ps1`, `installer\Stro-Deck.iss` | Reproducible per-user Windows installer workflow |
 | `hub-check.ps1`, `hub-push.ps1` | Nest Hub connectivity and WebView helpers |
 | `backgrounds/`, `icons/` | Image assets served by the app |
 | `tools/` | Additional network scanning utilities |
