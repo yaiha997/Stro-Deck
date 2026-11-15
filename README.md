@@ -1,21 +1,21 @@
 # Stro-Deck
 
-**Version 1.0.1**
+**Version 1.0.2**
 
 Stro-Deck turns a Windows computer into a customizable remote control. It runs a small web server on the computer and serves a button grid to a browser on another device on the same local network. Configure buttons in the desktop app; pressing a button in the browser performs its configured action on the Windows computer.
 
 ## Screenshots
 
 <p align="center">
-  <img src="docs/images/stro-deck-desktop-app.png" alt="Stro-Deck desktop app and button editor" width="760">
+  <img src="docs/images/stro-deck-desktop-app.png" alt="Stro-Deck desktop app and button editor with privacy-redacted address fields" width="760">
   <br>
   <em>Configure buttons, appearance, pairing, and optional startup behavior in the Windows app.</em>
 </p>
 
 <p align="center">
-  <img src="docs/images/spotify-deck-controls.jpg" alt="Stro-Deck deck with Spotify launch and media controls" width="760">
+  <img src="docs/images/stro-deck-video-display.png" alt="Stro-Deck touch-friendly deck display" width="760">
   <br>
-  <em>Open Spotify and control the active media session from the same touch-friendly deck.</em>
+  <em>Display your configured shortcuts over a still or animated background, then swipe between pages.</em>
 </p>
 
 <p align="center">
@@ -26,12 +26,21 @@ Stro-Deck turns a Windows computer into a customizable remote control. It runs a
 
 Try Stro-Deck and share your setup: **#Windows #Spotify #SmartHome #OpenSource #NestHub**
 
+## What's new in 1.0.2
+
+- **Multi-page decks:** configure 1–4 pages in the desktop app. Each page keeps the selected grid size, with page tabs in the editor and swipe gestures, dots, and previous/next arrows on the browser display.
+- **Video backgrounds:** choose MP4, M4V, WebM, or MOV files alongside still images and GIFs. The display plays video muted, inline, and on a loop. The server supports HTTP byte ranges so browsers and Cast devices can buffer video efficiently.
+- **Optional Cast optimization:** if `ffmpeg.exe` is already available on `PATH` or in the standard WinGet packages folder, Stro-Deck can convert a selected video or GIF to H.264 MP4, silent, up to 1280×720 at 30 fps. Without ffmpeg, the original video is copied and served; playback then depends on the target browser supporting its video codec. No extra software is bundled or installed by Stro-Deck.
+
+Video auto-play is muted to support browser autoplay policies. For the broadest compatibility—especially on Nest Hub/Chromecast—use H.264 MP4; other accepted extensions may contain codecs the target device cannot decode. The app does not convert video unless ffmpeg is found.
+
 ## Requirements
 
 - Windows
 - A phone, tablet, or other browser-enabled device on the same local network
 - Windows PowerShell and .NET Framework 4.x to run the app
 - The .NET Framework C# compiler (`csc.exe`) to rebuild from source
+- A browser with HTML5 video support for video backgrounds; video codec support varies by device
 - Optional: Google Nest Hub with WebView remote debugging enabled
 - Optional: OpenCode and Windows Terminal for the Greeting project launcher described below
 
@@ -58,13 +67,13 @@ Pair each browser before accessing track details, album artwork, or playback con
 4. `deck.html` is embedded into the executable and rendered by the remote device's browser. The page requests display state from `/api/state` and sends paired button presses to `/api/press`.
 5. Button actions run on the Windows computer. They can open apps and websites, run CMD or PowerShell commands, send keyboard/media input, type text, or perform power actions.
 
-The configuration is stored in `deck-config.txt` beside the executable and is managed by the desktop app. The app creates default buttons when no configuration exists.
+The configuration is stored in `deck-config.txt` beside the executable and is managed by the desktop app. The app creates default buttons when no configuration exists. Existing configurations without a `pages` setting continue to open as a one-page deck.
 
 ## Customize the deck
 
 Select a button in the desktop app, edit its label, icon, color, action, and target, then select **Save button**. Use **Test action** to try an action on the computer. Drag buttons to swap their positions, or change the number of columns and rows.
 
-The editor can also select image icons and a background image. Images are copied into the `icons` and `backgrounds` folders so the web page can serve them. The background position, clock display, and other appearance options are configurable in the app.
+The editor can also select image icons and image, GIF, or video backgrounds. Selected assets are copied into the `icons` and `backgrounds` folders so the web page can serve them. Configure up to four pages, each with its own grid of shortcuts. Background position, clock display, and other appearance options are configurable in the app.
 
 Available action types include:
 
@@ -179,6 +188,8 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 
 The build script compiles the C# sources, including runtime address discovery and Windows media-session support, embeds `deck.html`, and copies the .NET Windows Runtime interop assembly required by the media reader. Rebuild after changing source code or the page.
 
+After building, run `powershell -ExecutionPolicy Bypass -File .\package-release.ps1` to create `release\Stro-Deck-v1.0.2.zip`. The archive contains the executable, required Windows Runtime interop DLL, sample configuration, icons, and bundled backgrounds. It does not include an installer; the optional Inno Setup workflow below builds a separate setup executable.
+
 ### Create a Windows installer
 
 Install Inno Setup 6, then run:
@@ -200,6 +211,7 @@ The script rebuilds the app and compiles `installer\Stro-Deck.iss` into `install
 | `deck.html` | Remote browser interface |
 | `deck-config.txt` | Sanitized sample app configuration; the app's live network address is not stored here |
 | `build.ps1` | Source build script |
+| `package-release.ps1` | Builds the download-ready v1.0.2 ZIP |
 | `build-installer.ps1`, `installer\Stro-Deck.iss` | Reproducible per-user Windows installer workflow |
 | `hub-check.ps1`, `hub-push.ps1` | Nest Hub connectivity and WebView helpers |
 | `backgrounds/`, `icons/` | Image assets served by the app |

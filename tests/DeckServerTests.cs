@@ -15,11 +15,25 @@ namespace StroDeck
         {
             string tempDirectory = Path.Combine(Path.GetTempPath(), "stro-deck-auth-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempDirectory);
+            string backgroundsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backgrounds");
+            Directory.CreateDirectory(backgroundsDirectory);
+            string rangeFixture = Path.Combine(backgroundsDirectory, "range-test.mp4");
+            byte[] rangeFixtureBytes = Encoding.ASCII.GetBytes("video-range-test");
+            File.WriteAllBytes(rangeFixture, rangeFixtureBytes);
             DeckServer server = null;
             try
             {
                 int port = FindPort();
                 DeckConfig defaults = DeckConfig.Defaults();
+                DeckConfig legacy = new DeckConfig();
+                legacy.Normalize();
+                Assert(legacy.Pages == 1 && legacy.Buttons.Count == legacy.Cols * legacy.Rows,
+                    "configurations without a pages setting remain one page");
+                DeckConfig multiplePages = new DeckConfig();
+                multiplePages.Pages = 2;
+                multiplePages.Normalize();
+                Assert(multiplePages.Buttons.Count == multiplePages.Cols * multiplePages.Rows * 2,
+                    "a multi-page configuration reserves tiles on every page");
                 Assert(defaults.Buttons.Exists(delegate(DeckButton button)
                 {
                     return button.Label == "Spotify" && button.Action == "app" && button.Target == "spotify:";
@@ -112,6 +126,21 @@ namespace StroDeck
                     null, null, "");
                 Assert(publicState.Status == 200,
                     "the read-only deck state remains available to a display without pairing");
+                Assert(publicState.Body.Contains("\"pages\":1"),
+                    "the public deck state includes its page count");
+
+                Response videoRange = Request(server.Port, "GET", "/bg/range-test.mp4", host, null,
+                    null, null, "", "bytes=2-5");
+                Assert(videoRange.Status == 206 &&
+                    videoRange.Header("Content-Type") == "video/mp4" &&
+                    videoRange.Header("Content-Range") == "bytes 2-5/16" &&
+                    videoRange.Body == "deo-",
+                    "video files are served with the requested byte range and MIME type");
+
+                Response invalidVideoRange = Request(server.Port, "GET", "/bg/range-test.mp4", host, null,
+                    null, null, "", "bytes=16-");
+                Assert(invalidVideoRange.Status == 416,
+                    "unsatisfiable video byte ranges are rejected");
 
                 Response publicNowPlaying = Request(server.Port, "GET", "/api/now", host, null,
                     null, null, "");
@@ -156,6 +185,9 @@ namespace StroDeck
                 if (server != null) server.Stop();
                 Thread.Sleep(100);
                 if (Directory.Exists(tempDirectory)) Directory.Delete(tempDirectory, true);
+                if (File.Exists(rangeFixture)) File.Delete(rangeFixture);
+                if (Directory.Exists(backgroundsDirectory) && Directory.GetFileSystemEntries(backgroundsDirectory).Length == 0)
+                    Directory.Delete(backgroundsDirectory);
             }
         }
 
@@ -177,12 +209,19 @@ namespace StroDeck
         static Response Request(int port, string method, string path, string host, string origin,
             string cookie, string contentType, string body)
         {
+            return Request(port, method, path, host, origin, cookie, contentType, body, null);
+        }
+
+        static Response Request(int port, string method, string path, string host, string origin,
+            string cookie, string contentType, string body, string range)
+        {
             byte[] bodyBytes = Encoding.UTF8.GetBytes(body ?? "");
             StringBuilder request = new StringBuilder();
             request.Append(method).Append(' ').Append(path).Append(" HTTP/1.1\r\n");
             if (host != null) request.Append("Host: ").Append(host).Append("\r\n");
             if (origin != null) request.Append("Origin: ").Append(origin).Append("\r\n");
             if (cookie != null) request.Append("Cookie: ").Append(cookie).Append("\r\n");
+            if (range != null) request.Append("Range: ").Append(range).Append("\r\n");
             if (contentType != null) request.Append("Content-Type: ").Append(contentType).Append("\r\n");
             if (method == "POST") request.Append("Content-Length: ").Append(bodyBytes.Length).Append("\r\n");
             request.Append("Connection: close\r\n\r\n");
@@ -215,6 +254,7 @@ namespace StroDeck
         sealed class Response
         {
             public int Status;
+            public string Body = "";
             readonly System.Collections.Generic.Dictionary<string, string> headers =
                 new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -237,6 +277,8 @@ namespace StroDeck
                     if (colon > 0)
                         result.headers[lines[i].Substring(0, colon).Trim()] = lines[i].Substring(colon + 1).Trim();
                 }
+                int bodyStart = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+                if (bodyStart >= 0) result.Body = text.Substring(bodyStart + 4);
                 return result;
             }
         }

@@ -36,8 +36,10 @@ namespace StroDeck
         bool dragging;
 
         TableLayoutPanel grid;
+        FlowLayoutPanel tabBar;
         Button[] cells = new Button[0];
         int selected = 0;
+        int page;
         bool loadingFields;
         bool syncingCast;
 
@@ -46,7 +48,7 @@ namespace StroDeck
         DarkCombo cmbAction, cmbBgPos, cmbClock, cmbClockFmt;
         Button btnColor;
         Button btnToggle;
-        NumericUpDown numCols, numRows;
+        NumericUpDown numCols, numRows, numPages;
         UiCheck chkCastOn;
         System.Windows.Forms.Timer netTimer, uiTimer;
         NotifyIcon tray;
@@ -343,10 +345,15 @@ namespace StroDeck
             numRows.ValueChanged += delegate { if (!loadingFields) ApplyGridSize(); };
             bar1.Controls.Add(numRows);
 
+            bar1.Controls.Add(SmallLabel("Pages", new Padding(10, 7, 4, 0)));
+            numPages = MakeNumber(cfg.Pages, 1, 4);
+            numPages.ValueChanged += delegate { if (!loadingFields) ApplyGridSize(); };
+            bar1.Controls.Add(numPages);
+
             FlowLayoutPanel bar2 = MakeBar(100);
             card.Controls.Add(bar2);
             bar2.Controls.Add(MiniLabel("APPEARANCE"));
-            bar2.Controls.Add(MakeButton("Background image", 132, delegate { PickBackground(); }));
+            bar2.Controls.Add(MakeButton("Background", 102, delegate { PickBackground(); }));
 
             Label lpos = SmallLabel("Position", new Padding(8, 7, 4, 0));
             bar2.Controls.Add(lpos);
@@ -557,12 +564,68 @@ namespace StroDeck
             card.Margin = new Padding(0);
             host.Controls.Add(card);
 
+            tabBar = new FlowLayoutPanel();
+            tabBar.Dock = DockStyle.Top;
+            tabBar.Height = 36;
+            tabBar.WrapContents = false;
+            tabBar.AutoScroll = false;
+            tabBar.BackColor = Color.Transparent;
+            tabBar.Margin = new Padding(0);
+            card.Controls.Add(tabBar);
+
             grid = new TableLayoutPanel();
             grid.Dock = DockStyle.Fill;
             grid.BackColor = Color.FromArgb(11, 11, 14);
             grid.Margin = new Padding(0);
             card.Controls.Add(grid);
+            grid.BringToFront();
             return host;
+        }
+
+        void RebuildTabs()
+        {
+            if (tabBar == null) return;
+            tabBar.SuspendLayout();
+            Control[] old = new Control[tabBar.Controls.Count];
+            tabBar.Controls.CopyTo(old, 0);
+            foreach (Control control in old) control.Dispose();
+            tabBar.Controls.Clear();
+
+            Label caption = new Label();
+            caption.Text = "SHORTCUTS";
+            caption.Width = 92;
+            caption.Height = 26;
+            caption.TextAlign = ContentAlignment.MiddleLeft;
+            caption.ForeColor = Theme.AccentSoft;
+            caption.BackColor = Color.Transparent;
+            caption.Font = new Font("Segoe UI", 7.5f, FontStyle.Bold);
+            caption.Margin = new Padding(2, 5, 10, 0);
+            tabBar.Controls.Add(caption);
+
+            for (int i = 0; i < cfg.Pages; i++)
+            {
+                int targetPage = i;
+                UiButton tab = new UiButton();
+                tab.Text = "Page " + (i + 1);
+                tab.Width = 86;
+                tab.Height = 28;
+                tab.Margin = new Padding(0, 3, 8, 0);
+                tab.Radius = 14;
+                tab.TabStop = false;
+                bool current = i == page;
+                tab.BackColor = current ? Color.FromArgb(20, 38, 31) : CardBg;
+                tab.BorderColor = current ? Theme.Accent : Line;
+                tab.ForeColor = current ? Color.FromArgb(220, 255, 240) : Muted;
+                tab.Click += delegate
+                {
+                    SaveCurrent();
+                    page = targetPage;
+                    selected = targetPage * cfg.Cols * cfg.Rows;
+                    RebuildGrid();
+                };
+                tabBar.Controls.Add(tab);
+            }
+            tabBar.ResumeLayout();
         }
 
         Panel BuildEditor()
@@ -1051,10 +1114,74 @@ namespace StroDeck
             return i < 0 ? 0 : i;
         }
 
+        static bool IsVideoExt(string ext)
+        {
+            ext = (ext ?? "").ToLowerInvariant();
+            return ext == ".mp4" || ext == ".webm" || ext == ".mov" || ext == ".m4v";
+        }
+
+        static string FindFfmpeg()
+        {
+            string path = Environment.GetEnvironmentVariable("PATH");
+            if (!string.IsNullOrEmpty(path))
+            {
+                foreach (string directory in path.Split(';'))
+                {
+                    if (directory.Trim().Length == 0) continue;
+                    string candidate = Path.Combine(directory.Trim(), "ffmpeg.exe");
+                    if (File.Exists(candidate)) return candidate;
+                }
+            }
+
+            string packages = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                @"Microsoft\WinGet\Packages");
+            if (Directory.Exists(packages))
+            {
+                string[] candidates = Directory.GetFiles(packages, "ffmpeg.exe", SearchOption.AllDirectories);
+                if (candidates.Length > 0) return candidates[0];
+            }
+            return null;
+        }
+
+        static bool OptimizeVideo(string ffmpeg, string input, string output)
+        {
+            try
+            {
+                string filter = "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,fps=30";
+                ProcessStartInfo info = new ProcessStartInfo(ffmpeg);
+                info.Arguments = "-hide_banner -loglevel error -y -i \"" + input +
+                    "\" -an -c:v libx264 -preset veryfast -crf 27 -pix_fmt yuv420p " +
+                    "-profile:v main -level 4.0 -vf \"" + filter +
+                    "\" -movflags +faststart \"" + output + "\"";
+                info.UseShellExecute = false;
+                info.CreateNoWindow = true;
+                info.RedirectStandardError = true;
+                using (Process process = Process.Start(info))
+                {
+                    process.StandardError.ReadToEnd();
+                    if (!process.WaitForExit(300000))
+                    {
+                        process.Kill();
+                        process.WaitForExit();
+                        return false;
+                    }
+                    return process.ExitCode == 0 && File.Exists(output) &&
+                        new FileInfo(output).Length > 0;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         string BackgroundLabel()
         {
             if (string.IsNullOrEmpty(cfg.Background)) return "Background: none (black)";
-            string n = cfg.Background.StartsWith("img:") ? cfg.Background.Substring(4) : cfg.Background;
+            string n = cfg.Background.StartsWith("img:") || cfg.Background.StartsWith("vid:")
+                ? cfg.Background.Substring(4) : cfg.Background;
+            if (cfg.Background.StartsWith("vid:")) n = "\u25B6 " + n;
             return "Background: " + n;
         }
 
@@ -1088,6 +1215,10 @@ namespace StroDeck
 
         void RebuildGrid()
         {
+            if (page >= cfg.Pages) page = cfg.Pages - 1;
+            if (page < 0) page = 0;
+            RebuildTabs();
+
             grid.SuspendLayout();
             Control[] old = new Control[grid.Controls.Count];
             grid.Controls.CopyTo(old, 0);
@@ -1102,9 +1233,13 @@ namespace StroDeck
             for (int i = 0; i < cfg.Rows; i++)
                 grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / cfg.Rows));
 
-            cells = new Button[cfg.Buttons.Count];
-            for (int i = 0; i < cfg.Buttons.Count; i++)
+            int perPage = cfg.Cols * cfg.Rows;
+            int baseIndex = page * perPage;
+            cells = new Button[perPage];
+            for (int i = 0; i < perPage; i++)
             {
+                int idx = baseIndex + i;
+                if (idx >= cfg.Buttons.Count) break;
                 Button b = new Button();
                 b.Dock = DockStyle.Fill;
                 b.Margin = new Padding(6);
@@ -1118,8 +1253,7 @@ namespace StroDeck
                 b.TextAlign = ContentAlignment.MiddleCenter;
                 b.UseVisualStyleBackColor = false;
                 b.Cursor = Cursors.Hand;
-                b.Tag = i;
-                int idx = i;
+                b.Tag = idx;
                 b.Click += delegate
                 {
                     SaveCurrent();
@@ -1160,15 +1294,21 @@ namespace StroDeck
 
             if (selected >= cfg.Buttons.Count) selected = cfg.Buttons.Count - 1;
             if (selected < 0) selected = 0;
+            if (selected < page * perPage || selected >= (page + 1) * perPage)
+                selected = page * perPage;
             RefreshCells();
             SelectCell(selected);
         }
 
         void RefreshCells()
         {
-            for (int i = 0; i < cells.Length && i < cfg.Buttons.Count; i++)
+            int perPage = cfg.Cols * cfg.Rows;
+            int baseIndex = page * perPage;
+            for (int i = 0; i < cells.Length; i++)
             {
-                DeckButton b = cfg.Buttons[i];
+                int index = baseIndex + i;
+                if (index >= cfg.Buttons.Count) break;
+                DeckButton b = cfg.Buttons[index];
                 Button c = cells[i];
                 if (c == null) continue;
                 string icon = b.Icon ?? "";
@@ -1204,7 +1344,7 @@ namespace StroDeck
                     c.TextImageRelation = TextImageRelation.ImageBeforeText;
                 }
                 c.ForeColor = SafeColor(b.Color, Accent);
-                bool sel = (i == selected);
+                bool sel = (index == selected);
                 c.FlatAppearance.BorderSize = sel ? 2 : 1;
                 c.FlatAppearance.BorderColor = sel ? Accent : Line;
                 c.BackColor = sel ? Color.FromArgb(19, 27, 17) : CardBg;
@@ -1217,6 +1357,9 @@ namespace StroDeck
             if (i < 0) i = 0;
             if (i >= cfg.Buttons.Count) i = cfg.Buttons.Count - 1;
             selected = i;
+            int perPage = cfg.Cols * cfg.Rows;
+            page = i / perPage;
+            RebuildTabs();
             DeckButton b = cfg.Buttons[i];
             loadingFields = true;
             txtLabel.Text = b.Label;
@@ -1226,10 +1369,10 @@ namespace StroDeck
             txtTarget.Text = b.Target;
             btnColor.Text = b.Color;
             btnColor.ForeColor = SafeColor(b.Color, Accent);
-            lblSection.Text = "TILE " + (i + 1);
+            lblSection.Text = "TILE " + (i % perPage + 1) + "  ·  PAGE " + (page + 1);
             UpdateHint();
             loadingFields = false;
-            lblResult.Text = "Tile " + (i + 1);
+            lblResult.Text = "Tile " + (i % perPage + 1) + " (page " + (page + 1) + ")";
             RefreshCells();
         }
 
@@ -1272,20 +1415,49 @@ namespace StroDeck
         {
             using (OpenFileDialog d = new OpenFileDialog())
             {
-                d.Title = "Pick a background image (high resolution is fine)";
-                d.Filter = "Images|*.jpg;*.jpeg;*.png;*.webp;*.bmp|All files|*.*";
+                d.Title = "Pick a background - image, GIF or video";
+                d.Filter = "Backgrounds|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.mp4;*.webm;*.mov;*.m4v|" +
+                    "Images & GIFs|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif|" +
+                    "Videos|*.mp4;*.webm;*.mov;*.m4v|All files|*.*";
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 try
                 {
                     Directory.CreateDirectory(backgroundsDir);
                     string ext = Path.GetExtension(d.FileName).ToLowerInvariant();
                     if (ext.Length == 0) ext = ".jpg";
-                    string name = "bg_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + ext;
+                    string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                    bool isVideo = IsVideoExt(ext);
+                    bool isAnimated = isVideo || ext == ".gif";
+                    string ffmpeg = isAnimated ? FindFfmpeg() : null;
+                    if (ffmpeg != null)
+                    {
+                        string optimizedName = "bg_" + stamp + ".mp4";
+                        string optimizedPath = Path.Combine(backgroundsDir, optimizedName);
+                        lblResult.Text = "Optimizing background for smooth playback...";
+                        Cursor = Cursors.WaitCursor;
+                        Application.DoEvents();
+                        bool optimized;
+                        try { optimized = OptimizeVideo(ffmpeg, d.FileName, optimizedPath); }
+                        finally { Cursor = Cursors.Default; }
+                        if (optimized)
+                        {
+                            cfg.Background = "vid:" + optimizedName;
+                            lblResult.Text = "Video optimized for smooth cast playback";
+                            DeckConfig.Save(cfg, configPath);
+                            lblBg.Text = BackgroundLabel();
+                            return;
+                        }
+                        if (File.Exists(optimizedPath)) File.Delete(optimizedPath);
+                    }
+
+                    string name = "bg_" + stamp + ext;
                     File.Copy(d.FileName, Path.Combine(backgroundsDir, name), true);
-                    cfg.Background = "img:" + name;
+                    cfg.Background = (isVideo ? "vid:" : "img:") + name;
                     DeckConfig.Save(cfg, configPath);
                     lblBg.Text = BackgroundLabel();
-                    lblResult.Text = "Background set";
+                    lblResult.Text = isVideo
+                        ? (ffmpeg == null ? "Video set; install ffmpeg for automatic cast optimization" : "Video set in original format")
+                        : (isAnimated && ffmpeg == null ? "GIF set; install ffmpeg for cast optimization" : "Background set");
                 }
                 catch (Exception ex)
                 {
@@ -1454,8 +1626,13 @@ namespace StroDeck
         {
             cfg.Cols = (int)numCols.Value;
             cfg.Rows = (int)numRows.Value;
+            cfg.Pages = (int)numPages.Value;
             cfg.Normalize();
             DeckConfig.Save(cfg, configPath);
+            int perPage = cfg.Cols * cfg.Rows;
+            if (selected >= cfg.Buttons.Count) selected = cfg.Buttons.Count - 1;
+            if (selected < 0) selected = 0;
+            page = selected / perPage;
             RebuildGrid();
         }
 
