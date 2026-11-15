@@ -24,6 +24,12 @@ Stro-Deck turns a Windows computer into a customizable remote control. It runs a
   <em>Tap the now-playing banner to see artwork, track details, progress, and playback controls.</em>
 </p>
 
+<p align="center">
+  <img src="docs/images/stro-deck-multi-page-grid.png" alt="Stro-Deck multi-page grid layout" width="760">
+  <br>
+  <em>Organize shortcuts across multiple pages with swipe navigation and custom backgrounds.</em>
+</p>
+
 Try Stro-Deck and share your setup: **#Windows #Spotify #SmartHome #OpenSource #NestHub**
 
 ## What's new in 1.0.2
