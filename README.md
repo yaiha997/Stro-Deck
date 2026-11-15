@@ -7,7 +7,7 @@ Stro-Deck turns a Windows computer into a customizable remote control. It runs a
 ## Screenshots
 
 <p align="center">
-  <img src="docs/images/stro-deck-desktop-app.png" alt="Stro-Deck desktop app and button editor with privacy-redacted address fields" width="760">
+  <img src="docs/images/stro-deck-desktop-app-v102.png" alt="Stro-Deck desktop app and button editor with privacy-redacted address fields" width="760">
   <br>
   <em>Configure buttons, appearance, pairing, and optional startup behavior in the Windows app.</em>
 </p>
