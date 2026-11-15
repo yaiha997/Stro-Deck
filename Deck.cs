@@ -28,6 +28,7 @@ namespace StroDeck
     {
         public int Cols = 4;
         public int Rows = 3;
+        public int Pages = 1;
         public string Title = "STRO-DECK";
         public string Background = "";
         public string BackgroundPos = "center";
@@ -44,7 +45,9 @@ namespace StroDeck
             if (Cols > 8) Cols = 8;
             if (Rows < 1) Rows = 1;
             if (Rows > 8) Rows = 8;
-            int need = Cols * Rows;
+            if (Pages < 1) Pages = 1;
+            if (Pages > 4) Pages = 4;
+            int need = Cols * Rows * Pages;
             while (Buttons.Count < need)
                 Buttons.Add(new DeckButton { Label = "Empty", Icon = "+", Action = "none", Target = "" });
             while (Buttons.Count > need)
@@ -114,6 +117,7 @@ namespace StroDeck
                     if (line.Length == 0 || line.StartsWith("#")) continue;
                     if (line.StartsWith("cols=")) c.Cols = ParseInt(line.Substring(5), c.Cols);
                     else if (line.StartsWith("rows=")) c.Rows = ParseInt(line.Substring(5), c.Rows);
+                    else if (line.StartsWith("pages=")) c.Pages = ParseInt(line.Substring(6), c.Pages);
                     else if (line.StartsWith("title=")) c.Title = B64D(line.Substring(6));
                     else if (line.StartsWith("bgpos=")) c.BackgroundPos = B64D(line.Substring(6));
                     else if (line.StartsWith("clock=")) c.ClockStyle = B64D(line.Substring(6));
@@ -156,6 +160,7 @@ namespace StroDeck
             sb.AppendLine("# Stro-Deck config (edited by the app)");
             sb.AppendLine("cols=" + c.Cols.ToString(CultureInfo.InvariantCulture));
             sb.AppendLine("rows=" + c.Rows.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine("pages=" + c.Pages.ToString(CultureInfo.InvariantCulture));
             sb.AppendLine("title=" + B64E(c.Title));
             sb.AppendLine("bg=" + B64E(c.Background));
             sb.AppendLine("bgpos=" + B64E(c.BackgroundPos));
@@ -955,6 +960,7 @@ namespace StroDeck
             sb.Append("\",\"clockfmt\":\"").Append(Esc(c.ClockFormat));
             sb.Append("\",\"cols\":").Append(c.Cols);
             sb.Append(",\"rows\":").Append(c.Rows);
+            sb.Append(",\"pages\":").Append(c.Pages);
             sb.Append(",\"buttons\":[");
             for (int i = 0; i < c.Buttons.Count; i++)
             {
@@ -1220,7 +1226,8 @@ namespace StroDeck
                         else
                         {
                             string file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backgrounds", name);
-                            if (File.Exists(file)) Send(ns, 200, MimeFor(name), File.ReadAllBytes(file));
+                            if (File.Exists(file))
+                                SendFile(ns, file, MimeFor(name), headers.ContainsKey("Range") ? headers["Range"] : null);
                             else Send(ns, 404, "text/plain; charset=utf-8", Encoding.UTF8.GetBytes("not found"));
                         }
                     }
@@ -1263,8 +1270,124 @@ namespace StroDeck
                 case ".bmp": return "image/bmp";
                 case ".svg": return "image/svg+xml";
                 case ".ico": return "image/x-icon";
+                case ".mp4":
+                case ".m4v":
+                case ".mov": return "video/mp4";
+                case ".webm": return "video/webm";
             }
             return "application/octet-stream";
+        }
+
+        static void SendFile(NetworkStream ns, string file, string mime, string rangeHeader)
+        {
+            using (FileStream stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read,
+                65536, FileOptions.SequentialScan))
+            {
+                long length = stream.Length;
+                long start = 0;
+                long end = length - 1;
+                bool partial = false;
+
+                if (!string.IsNullOrEmpty(rangeHeader))
+                {
+                    if (length == 0 || !rangeHeader.StartsWith("bytes=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Send416(ns, length);
+                        return;
+                    }
+
+                    string spec = rangeHeader.Substring(6).Trim();
+                    int dash = spec.IndexOf('-');
+                    if (dash < 0 || spec.IndexOf(',', dash) >= 0)
+                    {
+                        Send416(ns, length);
+                        return;
+                    }
+
+                    string first = spec.Substring(0, dash).Trim();
+                    string last = spec.Substring(dash + 1).Trim();
+                    if (first.Length == 0)
+                    {
+                        long suffix;
+                        if (!long.TryParse(last, NumberStyles.None, CultureInfo.InvariantCulture, out suffix) ||
+                            suffix <= 0)
+                        {
+                            Send416(ns, length);
+                            return;
+                        }
+                        start = Math.Max(0, length - suffix);
+                    }
+                    else
+                    {
+                        if (!long.TryParse(first, NumberStyles.None, CultureInfo.InvariantCulture, out start) ||
+                            start >= length)
+                        {
+                            Send416(ns, length);
+                            return;
+                        }
+                        if (last.Length > 0 &&
+                            (!long.TryParse(last, NumberStyles.None, CultureInfo.InvariantCulture, out end) ||
+                             end < start))
+                        {
+                            Send416(ns, length);
+                            return;
+                        }
+                    }
+                    if (end >= length) end = length - 1;
+                    partial = true;
+                }
+
+                long count = end - start + 1;
+                StringBuilder response = new StringBuilder();
+                response.Append("HTTP/1.1 ").Append(partial ? "206 Partial Content" : "200 OK").Append("\r\n");
+                response.Append("Content-Type: ").Append(mime).Append("\r\n");
+                response.Append("Content-Length: ").Append(count.ToString(CultureInfo.InvariantCulture)).Append("\r\n");
+                response.Append("Accept-Ranges: bytes\r\n");
+                if (partial)
+                {
+                    response.Append("Content-Range: bytes ")
+                        .Append(start.ToString(CultureInfo.InvariantCulture)).Append('-')
+                        .Append(end.ToString(CultureInfo.InvariantCulture)).Append('/')
+                        .Append(length.ToString(CultureInfo.InvariantCulture)).Append("\r\n");
+                }
+                response.Append("Cache-Control: no-store\r\n");
+                response.Append("X-Content-Type-Options: nosniff\r\n");
+                response.Append("Referrer-Policy: no-referrer\r\n");
+                response.Append("Connection: close\r\n\r\n");
+                byte[] header = Encoding.ASCII.GetBytes(response.ToString());
+                ns.Write(header, 0, header.Length);
+
+                stream.Seek(start, SeekOrigin.Begin);
+                byte[] buffer = new byte[65536];
+                long remaining = count;
+                while (remaining > 0)
+                {
+                    int read = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
+                    if (read <= 0) break;
+                    ns.Write(buffer, 0, read);
+                    remaining -= read;
+                }
+                ns.Flush();
+            }
+        }
+
+        static void Send416(NetworkStream ns, long length)
+        {
+            byte[] body = Encoding.UTF8.GetBytes("range not satisfiable");
+            StringBuilder response = new StringBuilder();
+            response.Append("HTTP/1.1 416 Requested Range Not Satisfiable\r\n");
+            response.Append("Content-Type: text/plain; charset=utf-8\r\n");
+            response.Append("Content-Length: ").Append(body.Length).Append("\r\n");
+            response.Append("Content-Range: bytes */").Append(length.ToString(CultureInfo.InvariantCulture)).Append("\r\n");
+            response.Append("Accept-Ranges: bytes\r\n");
+            response.Append("Cache-Control: no-store\r\n");
+            response.Append("X-Content-Type-Options: nosniff\r\n");
+            response.Append("Referrer-Policy: no-referrer\r\n");
+            response.Append("Connection: close\r\n\r\n");
+            byte[] header = Encoding.ASCII.GetBytes(response.ToString());
+            ns.Write(header, 0, header.Length);
+            ns.Write(body, 0, body.Length);
+            ns.Flush();
         }
 
         static void Send(NetworkStream ns, int code, string contentType, byte[] body)

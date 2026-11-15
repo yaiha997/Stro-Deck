@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar" dir="ltr">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
@@ -9,69 +9,157 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;margin:0}
   body{
-    background:#000;
-    background-image:radial-gradient(130% 85% at 50% -10%, #131317 0%, #070709 45%, #000 100%);
-    background-size:cover;background-position:center;background-repeat:no-repeat;background-attachment:fixed;
-    color:#f2f2f4;
-    font-family:"Segoe UI",system-ui,-apple-system,"Noto Sans Arabic",sans-serif;
-    overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation;
+    background:#060608;
+    color:#f4f4f6;
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+    overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none;
   }
-  body.has-bg::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
-    background:linear-gradient(180deg, rgba(0,0,0,.10) 0%, rgba(0,0,0,.28) 55%, rgba(0,0,0,.52) 100%)}
-  header{position:relative;z-index:3;height:58px;display:flex;align-items:center;
-    justify-content:flex-start;padding:0 26px}
-  .clock{display:flex;align-items:baseline;gap:7px;font-variant-numeric:tabular-nums;
-    color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.45)}
-  header.c-bold .clock{font-size:clamp(30px,5.4vh,48px);font-weight:700;letter-spacing:.03em}
-  header.c-thin .clock{font-size:clamp(30px,5.4vh,48px);font-weight:200;letter-spacing:.16em}
-  header.c-small .clock{font-size:17px;font-weight:600;letter-spacing:.06em;color:rgba(255,255,255,.9)}
-  header.c-hidden .clock{display:none}
-  .clock .ap{font-size:.42em;font-weight:600;letter-spacing:.14em;opacity:.72;margin-left:2px}
-  .deck{position:absolute;inset:58px 0 0 0;z-index:1;display:grid;padding:0 16px 16px;
-    align-content:center;justify-items:center}
-  .cell{display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-width:0;min-height:0}
+
+  /* ---------- animated background layers ---------- */
+  .bg-media{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;
+    opacity:0;transition:opacity .8s ease;pointer-events:none}
+  #bgVid{transform:translateZ(0);backface-visibility:hidden}
+  .bg-media.on{opacity:1}
+
+  /* ---------- cast / low-power mode ----------
+     Chromecast & Nest Hub have weak GPUs. Backdrop-blurring 24 glass tiles over a
+     MOVING video forces a full recomposite every single frame and causes stutter.
+     When a video background is active, swap the glass for cheap opaque cards. */
+  body.video-bg .tile{
+    background:linear-gradient(160deg, rgba(28,28,36,.93) 0%, rgba(16,16,22,.90) 100%);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+    border-color:rgba(255,255,255,.17)}
+  body.video-bg .tile::after{display:none}
+  body.video-bg .now,
+  body.video-bg .page-arrow,
+  body.video-bg .toast{
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+    background:rgba(14,14,20,.9)}
+  .bg-shade{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:0;transition:opacity .8s ease;
+    background:linear-gradient(180deg, rgba(4,4,8,.38) 0%, rgba(4,4,8,.52) 55%, rgba(4,4,8,.78) 100%)}
+  .bg-shade.on{opacity:1}
+  .bg-shade::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(120% 90% at 50% 0%, transparent 55%, rgba(0,0,0,.35) 100%)}
+
+  /* ---------- header ---------- */
+  header{position:relative;z-index:3;height:118px;display:flex;align-items:center;
+    justify-content:space-between;padding:0 clamp(22px,3.4vw,44px);transition:opacity .25s ease}
+  .brand{font-size:11px;font-weight:700;letter-spacing:.34em;color:rgba(255,255,255,.55);
+    text-transform:uppercase;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+  .clockwrap{display:flex;flex-direction:column;align-items:center;position:absolute;
+    left:50%;transform:translateX(-50%);text-shadow:0 2px 18px rgba(0,0,0,.55)}
+  .clock{display:flex;align-items:baseline;gap:8px;font-variant-numeric:tabular-nums;color:#fff}
+  .clock .t{font-size:clamp(38px,7.2vh,64px);font-weight:200;letter-spacing:.1em;line-height:1}
+  .clock .ap{font-size:15px;font-weight:600;letter-spacing:.18em;opacity:.6}
+  .date{font-size:12.5px;font-weight:500;letter-spacing:.16em;color:rgba(255,255,255,.55);
+    margin-top:7px;text-transform:uppercase}
+  header.c-thin .clock .t{font-weight:100}
+  header.c-bold .clock .t{font-weight:600;letter-spacing:.04em}
+  header.c-small .clock .t{font-size:20px;font-weight:600;letter-spacing:.08em}
+  header.c-small .date{display:none}
+  header.c-hidden .clockwrap{display:none}
+
+  /* now-playing pill (top right) */
+  .now{display:none;align-items:center;gap:10px;max-width:min(330px,34vw);height:48px;
+    padding:6px 16px 6px 7px;border-radius:999px;cursor:pointer;color:#fff;font:inherit;
+    border:1px solid rgba(255,255,255,.16);
+    background:rgba(16,16,22,.46);
+    -webkit-backdrop-filter:blur(20px) saturate(160%);backdrop-filter:blur(20px) saturate(160%);
+    box-shadow:0 8px 26px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.10);
+    transition:transform .15s ease;overflow:hidden}
+  .now.show{display:flex}
+  .now:active{transform:scale(.97)}
+  .now-art{width:36px;height:36px;border-radius:50%;object-fit:cover;flex:none;
+    background:#1c1c24;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .now-txt{display:flex;flex-direction:column;min-width:0;text-align:left}
+  .now-title{font-size:13.5px;font-weight:600;line-height:1.25;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .now-artist{font-size:11px;color:rgba(255,255,255,.55);line-height:1.25;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .eq{display:flex;align-items:flex-end;gap:2.5px;height:15px;width:15px;flex:none;opacity:.9}
+  .eq i{flex:1;height:30%;border-radius:1.5px;background:var(--acc,#34d399)}
+  .eq.play i{animation:eq 900ms ease-in-out infinite}
+  .eq.play i:nth-child(2){animation-delay:160ms}
+  .eq.play i:nth-child(3){animation-delay:320ms}
+  @keyframes eq{0%,100%{height:26%}50%{height:100%}}
+
+  /* ---------- paged deck ---------- */
+  .viewport{position:absolute;inset:118px 0 46px 0;z-index:2;overflow:hidden}
+  .track{display:flex;height:100%;transition:transform .38s cubic-bezier(.22,.9,.28,1)}
+  .track.drag{transition:none}
+  .page{flex:0 0 100%;height:100%;display:grid;padding:6px clamp(18px,3vw,40px) 10px;
+    align-content:center;justify-items:center;gap:10px}
+
+  .cell{display:flex;align-items:center;justify-content:center;width:100%;height:100%;
+    min-width:0;min-height:0}
+
+  /* ---------- tile: new design ---------- */
   .tile{
-    --c:#39ff14;--r:0deg;--x:0px;--y:0px;--s:1;
+    --c:#34d399;
     position:relative;width:var(--tile,120px);height:var(--tile,120px);
-    border:1px solid rgba(255,255,255,.30);
-    border-radius:27%;
-    background:linear-gradient(155deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,.040) 45%, rgba(255,255,255,.015) 100%);
-    -webkit-backdrop-filter:blur(22px) saturate(190%) brightness(1.06);
-    backdrop-filter:blur(22px) saturate(190%) brightness(1.06);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -1px 0 rgba(0,0,0,.16),
-      0 10px 26px rgba(0,0,0,.26);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
-    transform:rotate(var(--r)) translate(var(--x),var(--y)) scale(var(--s));
-    transition:transform .13s ease,box-shadow .2s ease,background .2s ease;
+    border-radius:24%;
+    border:1px solid rgba(255,255,255,.13);
+    background:linear-gradient(160deg, rgba(255,255,255,.09) 0%, rgba(255,255,255,.03) 55%, rgba(255,255,255,.015) 100%);
+    -webkit-backdrop-filter:blur(18px) saturate(150%);
+    backdrop-filter:blur(18px) saturate(150%);
+    box-shadow:0 12px 30px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.14);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
     color:#fff;cursor:pointer;padding:0;font:inherit;overflow:hidden;
+    transition:transform .14s ease,box-shadow .22s ease,border-color .22s ease;
   }
-  .tile::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
-    background:radial-gradient(120% 58% at 50% -10%, rgba(255,255,255,.30), transparent 60%),
-      radial-gradient(120% 78% at 50% 115%, color-mix(in srgb,var(--c) 16%,transparent), transparent 70%);
-    opacity:.75}
-  .tile .ic{position:relative;font-size:calc(var(--tile,120px)*.31);line-height:1;
-    filter:drop-shadow(0 2px 10px rgba(0,0,0,.45)) drop-shadow(0 0 16px color-mix(in srgb,var(--c) 40%,transparent))}
-  .tile .ic-img{position:relative;width:calc(var(--tile,120px)*.44);height:calc(var(--tile,120px)*.44);
-    object-fit:contain;border-radius:20%;
-    filter:drop-shadow(0 2px 10px rgba(0,0,0,.45)) drop-shadow(0 0 14px color-mix(in srgb,var(--c) 30%,transparent))}
-  .tile .lb{position:relative;margin-top:calc(var(--tile,120px)*.075);
-    font-size:calc(var(--tile,120px)*.086);font-weight:600;
-    letter-spacing:.04em;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.65);
-    max-width:92%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px}
-  .tile.active{transform:rotate(var(--r)) translate(var(--x),var(--y)) scale(calc(var(--s)*.9));
-    box-shadow:0 0 0 2px rgba(255,255,255,.6),
-      0 0 60px color-mix(in srgb,var(--c) 40%,transparent),inset 0 1px 0 rgba(255,255,255,.6)}
-  .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,24px);
-    background:#111114;border:1px solid #2a2a32;color:#e8e8ee;padding:11px 22px;border-radius:999px;
-    font-size:14px;opacity:0;transition:all .25s ease;pointer-events:none;z-index:9;
-    max-width:80vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tile::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:radial-gradient(130% 60% at 50% -12%, rgba(255,255,255,.16), transparent 60%)}
+  .tile .chip{position:relative;display:flex;align-items:center;justify-content:center;
+    width:calc(var(--tile,120px)*.46);height:calc(var(--tile,120px)*.46);border-radius:28%;
+    background:color-mix(in srgb,var(--c) 16%,rgba(10,10,14,.55));
+    border:1px solid color-mix(in srgb,var(--c) 34%,transparent);
+    box-shadow:0 0 22px color-mix(in srgb,var(--c) 18%,transparent),
+      inset 0 1px 0 rgba(255,255,255,.14)}
+  .tile .ic{font-size:calc(var(--tile,120px)*.235);line-height:1;
+    filter:drop-shadow(0 1px 6px rgba(0,0,0,.5))}
+  .tile .ic-img{width:78%;height:78%;object-fit:contain;border-radius:18%}
+  .tile .lb{position:relative;margin-top:calc(var(--tile,120px)*.085);
+    font-size:calc(var(--tile,120px)*.088);font-weight:600;letter-spacing:.05em;
+    color:rgba(255,255,255,.92);text-shadow:0 1px 5px rgba(0,0,0,.6);
+    max-width:90%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tile:active{transform:scale(.92)}
+  .tile.flash{border-color:color-mix(in srgb,var(--c) 70%,#fff);
+    box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 55%,transparent),
+      0 0 46px color-mix(in srgb,var(--c) 34%,transparent),
+      0 12px 30px rgba(0,0,0,.34)}
+
+  /* ---------- page dots ---------- */
+  .dots{position:absolute;left:0;right:0;bottom:14px;z-index:3;display:none;
+    align-items:center;justify-content:center;gap:9px}
+  .dots.on{display:flex}
+  .dot{width:7px;height:7px;border-radius:99px;border:0;padding:0;cursor:pointer;
+    background:rgba(255,255,255,.28);transition:all .25s ease}
+  .dot.cur{width:22px;background:#fff;box-shadow:0 0 10px rgba(255,255,255,.5)}
+  .page-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:3;
+    width:44px;height:72px;border:0;border-radius:14px;cursor:pointer;color:rgba(255,255,255,.75);
+    background:rgba(14,14,20,.34);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    display:none;align-items:center;justify-content:center;transition:background .2s ease}
+  .page-arrow svg{width:20px;height:20px;stroke:currentColor;fill:none;
+    stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+  .page-arrow:active{background:rgba(40,40,52,.55)}
+  .dots.on ~ .page-arrow{display:flex}
+  .page-arrow.prev{left:10px}
+  .page-arrow.next{right:10px}
+
+  /* ---------- toast / offline ---------- */
+  .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,24px);z-index:40;
+    background:rgba(14,14,20,.82);border:1px solid rgba(255,255,255,.12);color:#ececf2;
+    padding:10px 22px;border-radius:999px;font-size:13.5px;opacity:0;
+    transition:all .25s ease;pointer-events:none;max-width:80vw;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
   .toast.show{opacity:1;transform:translate(-50%,0)}
-  .toast.ok{border-color:#2d5f2a;box-shadow:0 0 24px rgba(57,255,20,.12)}
-  .toast.err{border-color:#6b2b2b;color:#ffb4b4}
+  .toast.ok{border-color:rgba(52,211,153,.45);box-shadow:0 0 24px rgba(52,211,153,.14)}
+  .toast.err{border-color:rgba(255,107,107,.5);color:#ffc1c1}
   .offline{position:fixed;top:0;left:0;right:0;height:3px;background:#ff5252;
-    box-shadow:0 0 12px #ff5252;opacity:0;transition:opacity .3s;z-index:10}
+    box-shadow:0 0 12px #ff5252;opacity:0;transition:opacity .3s;z-index:50}
   .offline.show{opacity:1}
-  .pair-panel{position:fixed;inset:0;z-index:8;display:flex;flex-direction:column;
+  .pair-panel{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;
     align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.94);text-align:center}
   .pair-panel[hidden]{display:none}
   .pair-panel h1{font-size:clamp(24px,5vw,40px);margin:0 0 12px}
@@ -80,72 +168,138 @@
   .pair-panel input,.pair-panel button{min-height:48px;border-radius:10px;font:inherit}
   .pair-panel input{width:190px;padding:8px 14px;border:1px solid #555;color:#fff;background:#151519;
     text-align:center;letter-spacing:.18em;user-select:text;-webkit-user-select:text}
-  .pair-panel button{padding:8px 18px;border:0;background:#39ff14;color:#071006;font-weight:700}
+  .pair-panel button{padding:8px 18px;border:0;background:#34d399;color:#071006;font-weight:700}
   #pairMessage{min-height:1.5em;color:#ffb4b4}
-  .now{position:absolute;left:50%;top:7px;transform:translateX(-50%);z-index:4;display:none;
-    align-items:center;gap:10px;width:min(430px,calc(100vw - 210px));height:44px;padding:5px 12px;
-    color:#fff;text-align:left;font:inherit;cursor:pointer;overflow:hidden;border:1px solid rgba(255,255,255,.3);
-    border-radius:15px;background:rgba(20,35,39,.72);backdrop-filter:blur(20px) saturate(170%);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 22px rgba(0,0,0,.24)}
-  .now.show{display:flex}
-  .now-art{width:32px;height:32px;flex:none;object-fit:cover;border-radius:8px;background:#24242b}
-  .now-meta{display:flex;flex-direction:column;min-width:0;flex:1}
-  .now-title,.now-artist{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .now-title{font-size:14px;font-weight:650}
-  .now-artist{font-size:11px;color:rgba(255,255,255,.68)}
+  body.pairing .viewport,body.pairing .dots,body.pairing .page-arrow{visibility:hidden}
+
+  /* ---------- fullscreen player ---------- */
   .player{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
-    padding:24px;color:#fff;background:radial-gradient(110% 100% at 50% 0%,#343728,#11120f 65%,#080909)}
+    overflow:hidden;background:#050507}
   .player.open{display:flex}
-  .player-inner{display:flex;align-items:center;gap:clamp(24px,5vw,56px);width:min(980px,100%)}
-  .player-art{width:min(48vw,52vh);aspect-ratio:1;flex:none;object-fit:cover;border-radius:22px;
-    background:#202027;box-shadow:0 24px 70px rgba(0,0,0,.5)}
-  .player-meta{min-width:0;flex:1}
-  .player-kicker{font-size:11px;font-weight:700;letter-spacing:.28em;color:#ff725f}
-  .player-title{margin-top:12px;font-size:clamp(28px,5vh,48px);font-weight:700;line-height:1.1}
-  .player-artist{margin-top:9px;color:rgba(255,255,255,.68)}
-  .player-album{margin-top:4px;color:rgba(255,255,255,.48);font-size:13px}
-  .player-progress{height:4px;margin-top:26px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden}
-  .player-progress i{display:block;width:0;height:100%;background:#ff725f}
-  .player-times{display:flex;justify-content:space-between;margin-top:7px;color:rgba(255,255,255,.55);font-size:11px}
-  .player-controls{display:flex;align-items:center;gap:16px;margin-top:23px}
-  .player-controls button,.player-close{width:48px;height:48px;border:1px solid rgba(255,255,255,.25);
-    border-radius:50%;color:#fff;background:rgba(255,255,255,.1);font:inherit;font-size:19px;cursor:pointer}
-  .player-controls .primary{width:60px;height:60px;border-color:#ff725f;font-size:22px}
-  .player-close{position:absolute;right:22px;bottom:22px;font-size:23px}
-  body.player-open .deck,body.player-open header{visibility:hidden}
-  @media(max-width:650px){.now{width:calc(100vw - 160px)}.player-inner{flex-direction:column;gap:20px;text-align:center}
-    .player-art{width:min(45vh,72vw)}.player-meta{width:100%}.player-controls{justify-content:center}}
+  .player-glow{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    filter:blur(60px) saturate(160%) brightness(.5);transform:scale(1.25);pointer-events:none}
+  .player-shade{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(100% 80% at 50% 50%, rgba(0,0,0,.1), rgba(0,0,0,.6))}
+  .player-inner{position:relative;display:flex;align-items:center;gap:clamp(26px,4vw,62px);
+    padding:0 clamp(20px,5vw,70px);max-width:1180px;width:100%}
+  .player-art{width:min(52vh,38vw);height:min(52vh,38vw);border-radius:24px;object-fit:cover;flex:none;
+    border:1px solid rgba(255,255,255,.18);background:#14141a;
+    box-shadow:0 30px 70px rgba(0,0,0,.6),0 0 80px color-mix(in srgb,var(--acc,#34d399) 18%,transparent)}
+  .player-side{min-width:0;flex:1;display:flex;flex-direction:column;justify-content:center;text-align:left}
+  .player-kicker{font-size:11px;font-weight:700;letter-spacing:.32em;color:var(--acc,#34d399);
+    opacity:.9;margin-bottom:14px}
+  .player-title{font-size:clamp(26px,4.2vh,44px);font-weight:700;line-height:1.15;
+    text-shadow:0 2px 18px rgba(0,0,0,.5);overflow:hidden;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .player-artist{font-size:clamp(14px,1.9vh,19px);color:rgba(255,255,255,.6);margin-top:10px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player-bar{margin-top:clamp(18px,3.2vh,30px);height:4px;border-radius:99px;
+    width:100%;background:rgba(255,255,255,.14);overflow:hidden}
+  .player-bar i{display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,var(--acc,#34d399),#fff);
+    box-shadow:0 0 14px color-mix(in srgb,var(--acc,#34d399) 55%,transparent);
+    transition:width .35s linear}
+  .player-times{display:flex;justify-content:space-between;width:100%;margin-top:9px;
+    font-size:12px;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums}
+  .player-ctrl{display:flex;align-items:center;gap:clamp(14px,2.4vw,26px);
+    margin-top:clamp(18px,3.4vh,34px)}
+  .pbtn{width:56px;height:56px;border-radius:50%;border:1px solid rgba(255,255,255,.22);
+    cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;color:#fff;
+    background:rgba(255,255,255,.07);
+    -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+    transition:transform .12s ease,background .2s ease}
+  .pbtn svg{width:22px;height:22px;fill:currentColor;display:block}
+  .pbtn:active{transform:scale(.92)}
+  .pbtn.main{width:74px;height:74px;border-color:color-mix(in srgb,var(--acc,#34d399) 55%,transparent);
+    box-shadow:0 0 36px color-mix(in srgb,var(--acc,#34d399) 26%,transparent)}
+  .pbtn.main svg{width:28px;height:28px}
+  .pbtn .ic-pause{display:none}
+  .pbtn.playing .ic-play{display:none}
+  .pbtn.playing .ic-pause{display:block}
+  .player-exit{position:absolute;right:clamp(18px,2.6vw,34px);bottom:clamp(16px,2.4vw,30px);
+    width:54px;height:54px;border-radius:50%;border:1px solid rgba(255,255,255,.22);cursor:pointer;
+    background:rgba(255,255,255,.07);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+    display:flex;align-items:center;justify-content:center;color:#fff;z-index:2}
+  .player-exit svg{width:20px;height:20px;stroke:currentColor;fill:none;
+    stroke-width:2.2;stroke-linecap:round}
+  body.player-open header{opacity:0;pointer-events:none}
+  body.player-open .viewport,body.player-open .dots,body.player-open .page-arrow{visibility:hidden}
+
+  @media (max-aspect-ratio: 4/5){
+    .player-inner{flex-direction:column;gap:clamp(16px,3vh,30px);text-align:center}
+    .player-art{width:min(40vh,74vw);height:min(40vh,74vw);border-radius:20px}
+    .player-side{text-align:center;align-items:center;width:100%}
+    .player-bar,.player-times{max-width:460px}
+    .player-ctrl{justify-content:center}
+    .brand{display:none}
+  }
 </style>
 </head>
 <body>
+
+<img class="bg-media" id="bgImg" alt="">
+<video class="bg-media" id="bgVid" muted loop playsinline autoplay preload="auto" disablePictureInPicture webkit-playsinline></video>
+<div class="bg-shade" id="bgShade"></div>
 <div class="offline" id="offline"></div>
+
 <header id="hdr">
-  <div class="clock" id="clock"><span id="clockTime">--:--</span><span class="ap" id="clockAp"></span></div>
-  <button class="now" id="now" type="button" aria-label="Open now playing">
+  <div class="brand">Stro&#8202;Deck</div>
+  <div class="clockwrap">
+    <div class="clock"><span class="t" id="clockTime">--:--</span><span class="ap" id="clockAp"></span></div>
+    <div class="date" id="dateLine"></div>
+  </div>
+  <button class="now" id="now" type="button" aria-label="Now playing">
     <img class="now-art" id="nowArt" alt="">
-    <span class="now-meta"><span class="now-title" id="nowTitle"></span><span class="now-artist" id="nowArtist"></span></span>
+    <span class="now-txt">
+      <span class="now-title" id="nowTitle"></span>
+      <span class="now-artist" id="nowArtist"></span>
+    </span>
+    <span class="eq" id="nowEq"><i></i><i></i><i></i></span>
   </button>
 </header>
-<main class="deck" id="deck"></main>
-<section class="player" id="player" aria-hidden="true">
+
+<div class="viewport" id="viewport">
+  <div class="track" id="track"></div>
+</div>
+
+<div class="dots" id="dots"></div>
+<button class="page-arrow prev" id="pgPrev" type="button" aria-label="Previous page">
+  <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+</button>
+<button class="page-arrow next" id="pgNext" type="button" aria-label="Next page">
+  <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+</button>
+
+<div class="player" id="player" aria-hidden="true">
+  <img class="player-glow" id="pGlow" alt="">
+  <div class="player-shade"></div>
   <div class="player-inner">
-    <img class="player-art" id="playerArt" alt="">
-    <div class="player-meta">
+    <img class="player-art" id="pArt" alt="">
+    <div class="player-side">
       <div class="player-kicker">NOW PLAYING</div>
-      <div class="player-title" id="playerTitle"></div>
-      <div class="player-artist" id="playerArtist"></div>
-      <div class="player-album" id="playerAlbum"></div>
-      <div class="player-progress"><i id="playerBar"></i></div>
-      <div class="player-times"><span id="playerPosition">0:00</span><span id="playerDuration">0:00</span></div>
-      <div class="player-controls">
-        <button id="playerPrev" type="button" aria-label="Previous track">|◀</button>
-        <button id="playerToggle" class="primary" type="button" aria-label="Play or pause">▶</button>
-        <button id="playerNext" type="button" aria-label="Next track">▶|</button>
+      <div class="player-title" id="pTitle"></div>
+      <div class="player-artist" id="pArtist"></div>
+      <div class="player-bar"><i id="pBar"></i></div>
+      <div class="player-times"><span id="pPos">0:00</span><span id="pEnd">0:00</span></div>
+      <div class="player-ctrl">
+        <button class="pbtn" id="pPrev" type="button" aria-label="Previous">
+          <svg viewBox="0 0 24 24"><path d="M7 5h2.6v14H7zM18.5 5v14L9.6 12z"/></svg>
+        </button>
+        <button class="pbtn main" id="pPlay" type="button" aria-label="Play or pause">
+          <svg class="ic-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6L19 12z"/></svg>
+          <svg class="ic-pause" viewBox="0 0 24 24"><path d="M8 5h3.2v14H8zM12.8 5H16v14h-3.2z"/></svg>
+        </button>
+        <button class="pbtn" id="pNext" type="button" aria-label="Next">
+          <svg viewBox="0 0 24 24"><path d="M14.4 5H17v14h-2.6zM5.5 5v14L14.4 12z"/></svg>
+        </button>
       </div>
     </div>
   </div>
-  <button class="player-close" id="playerClose" type="button" aria-label="Close player">×</button>
-</section>
+  <button class="player-exit" id="pExit" type="button" aria-label="Exit fullscreen">
+    <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+</div>
+
 <section class="pair-panel" id="pairPanel" hidden>
   <h1>Pair this browser</h1>
   <p>Enter the 8-digit pairing code shown in Stro-Deck on the computer. This browser will remember the pairing for 7 days.</p>
@@ -156,42 +310,52 @@
   </form>
   <p id="pairMessage" role="status"></p>
 </section>
+
 <div class="toast" id="toast"></div>
+
 <script>
 (function () {
-  var deck = document.getElementById('deck');
+  var track = document.getElementById('track');
+  var viewport = document.getElementById('viewport');
+  var dotsEl = document.getElementById('dots');
   var headerEl = document.getElementById('hdr');
   var clockTimeEl = document.getElementById('clockTime');
   var clockApEl = document.getElementById('clockAp');
-  var clockFormat = '24';
+  var dateEl = document.getElementById('dateLine');
   var toastEl = document.getElementById('toast');
   var offlineEl = document.getElementById('offline');
   var pairPanel = document.getElementById('pairPanel');
   var pairForm = document.getElementById('pairForm');
   var pairCode = document.getElementById('pairCode');
   var pairMessage = document.getElementById('pairMessage');
+  var bgImg = document.getElementById('bgImg');
+  var bgVid = document.getElementById('bgVid');
+  var bgShade = document.getElementById('bgShade');
+  var clockFormat = '24';
   var state = null;
   var toastTimer = null;
+  var page = 0;
+  var pageCount = 1;
+
+  var nowEl = document.getElementById('now');
+  var nowArtEl = document.getElementById('nowArt');
+  var nowTitleEl = document.getElementById('nowTitle');
+  var nowArtistEl = document.getElementById('nowArtist');
+  var nowEqEl = document.getElementById('nowEq');
+  var playerEl = document.getElementById('player');
+  var pArtEl = document.getElementById('pArt');
+  var pGlowEl = document.getElementById('pGlow');
+  var pTitleEl = document.getElementById('pTitle');
+  var pArtistEl = document.getElementById('pArtist');
+  var pBarEl = document.getElementById('pBar');
+  var pPosEl = document.getElementById('pPos');
+  var pEndEl = document.getElementById('pEnd');
+  var pPlayEl = document.getElementById('pPlay');
   var nowData = null;
   var lastCover = -1;
   var playerOpen = false;
-  var nowEl = document.getElementById('now');
-  var playerEl = document.getElementById('player');
 
-  var playerNodes = {
-    nowArt: document.getElementById('nowArt'),
-    nowTitle: document.getElementById('nowTitle'),
-    nowArtist: document.getElementById('nowArtist'),
-    art: document.getElementById('playerArt'),
-    title: document.getElementById('playerTitle'),
-    artist: document.getElementById('playerArtist'),
-    album: document.getElementById('playerAlbum'),
-    bar: document.getElementById('playerBar'),
-    position: document.getElementById('playerPosition'),
-    duration: document.getElementById('playerDuration'),
-    toggle: document.getElementById('playerToggle')
-  };
-
+  /* ---------- clock & date ---------- */
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function tick() {
     var d = new Date(), h = d.getHours(), m = d.getMinutes(), ap = '';
@@ -204,6 +368,10 @@
       clockTimeEl.textContent = pad(h) + ':' + pad(m);
     }
     clockApEl.textContent = ap;
+    try {
+      dateEl.textContent = d.toLocaleDateString('en-US',
+        { weekday: 'long', month: 'long', day: 'numeric' });
+    } catch (e) { dateEl.textContent = ''; }
   }
   tick();
   setInterval(tick, 5000);
@@ -217,121 +385,230 @@
 
   function showPairing(message) {
     closePlayer();
+    document.body.classList.add('pairing');
     pairPanel.hidden = false;
-    deck.style.visibility = 'hidden';
     pairMessage.textContent = message || '';
   }
 
   function loadAuthorized() {
+    document.body.classList.remove('pairing');
     pairPanel.hidden = true;
-    deck.style.visibility = '';
     load();
     loadNow();
   }
 
-  pairForm.addEventListener('submit', function (e) {
-    e.preventDefault();
+  pairForm.addEventListener('submit', function (event) {
+    event.preventDefault();
     pairMessage.textContent = '';
     fetch('/api/pair', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
       body: JSON.stringify({ code: pairCode.value })
-    }).then(function (r) {
-      return r.json().then(function (j) {
-        if (!r.ok || !j.ok) throw new Error(j.msg || 'Pairing failed');
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        if (!response.ok || !data.ok) throw new Error(data.msg || 'Pairing failed');
         pairCode.value = '';
         loadAuthorized();
       });
-    }).catch(function (err) {
-      showPairing(err.message || 'Pairing failed');
+    }).catch(function (error) {
+      showPairing(error.message || 'Pairing failed');
     });
   });
 
-  /* deterministic "scatter" so the layout is stable but not a rigid grid */
-  function scatter(i) {
-    var x = (((i * 53) % 7) - 3) * 0.4;
-    var y = (((i * 29) % 9) - 4) * 0.3;
-    return { r: 0, x: x, y: y, s: 1 };
-  }
-
-  function layout() {
-    if (!state) return;
-    var cs = getComputedStyle(deck);
-    var padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-    var padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-    var gap = 8;
-    var w = (deck.clientWidth - padX - gap * (state.cols - 1)) / state.cols;
-    var h = (deck.clientHeight - padY - gap * (state.rows - 1)) / state.rows;
-    var size = Math.max(46, Math.min(w, h) * 0.88);
-    deck.style.gap = gap + 'px';
-    deck.style.setProperty('--tile', size + 'px');
+  /* ---------- background (image / gif / video) ---------- */
+  var bgRetry = null;
+  function playVideo() {
+    try {
+      var pr = bgVid.play();
+      if (pr && pr.catch) pr.catch(function () {});
+    } catch (e) {}
   }
 
   function applyBackground(s) {
     var bg = s.bg || '';
-    if (bg.indexOf('img:') === 0) {
-      document.body.classList.add('has-bg');
-      document.body.style.backgroundImage = "url('/bg/" + encodeURIComponent(bg.substring(4)) + "')";
-      document.body.style.backgroundPosition = s.bgpos || 'center';
+    var pos = s.bgpos || 'center';
+    var isVid = bg.indexOf('vid:') === 0;
+    document.body.classList.toggle('video-bg', isVid);
+    bgImg.classList.remove('on');
+    bgVid.classList.remove('on');
+    bgShade.classList.remove('on');
+    clearTimeout(bgRetry);
+    if (isVid) {
+      var src = '/bg/' + encodeURIComponent(bg.substring(4));
+      if (bgVid.getAttribute('src') !== src) {
+        bgVid.setAttribute('src', src);
+        bgVid.load();
+        playVideo();
+        // Retry a few times: on cast devices autoplay can be blocked until the
+        // first user gesture / a moment after the page has settled.
+        var tries = 0;
+        (function retry() {
+          if (bgVid.getAttribute('src') !== src || bgVid.readyState > 2) return;
+          if (++tries > 6) return;
+          playVideo();
+          bgRetry = setTimeout(retry, 800);
+        })();
+      } else {
+        playVideo();
+      }
+      bgVid.style.objectPosition = pos;
+      bgVid.classList.add('on');
+      bgShade.classList.add('on');
+    } else if (bg.indexOf('img:') === 0) {
+      bgVid.pause();
+      bgImg.src = '/bg/' + encodeURIComponent(bg.substring(4));
+      bgImg.style.objectPosition = pos;
+      bgImg.classList.add('on');
+      bgShade.classList.add('on');
     } else {
-      document.body.classList.remove('has-bg');
-      document.body.style.backgroundImage = '';
+      bgVid.pause();
     }
   }
 
+  /* ---------- layout ---------- */
+  function layout() {
+    if (!state) return;
+    var pages = track.children;
+    for (var p = 0; p < pages.length; p++) {
+      var pg = pages[p];
+      var size = tileSize(pg);
+      pg.style.setProperty('--tile', size + 'px');
+    }
+  }
+
+  function tileSize(pg) {
+    var cs = getComputedStyle(pg);
+    var padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    var padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    var gap = 10;
+    var w = (pg.clientWidth - padX - gap * (state.cols - 1)) / state.cols;
+    var h = (pg.clientHeight - padY - gap * (state.rows - 1)) / state.rows;
+    return Math.max(46, Math.min(w, h) * 0.9);
+  }
+
+  /* ---------- pages ---------- */
+  function goTo(p, instant) {
+    if (p < 0) p = 0;
+    if (p >= pageCount) p = pageCount - 1;
+    page = p;
+    if (instant) track.classList.add('drag');
+    track.style.transform = 'translateX(' + (-page * 100) + '%)';
+    if (instant) {
+      void track.offsetWidth;
+      track.classList.remove('drag');
+    }
+    var ds = dotsEl.children;
+    for (var i = 0; i < ds.length; i++) ds[i].className = 'dot' + (i === page ? ' cur' : '');
+  }
+
+  document.getElementById('pgPrev').addEventListener('click', function () { goTo(page - 1); });
+  document.getElementById('pgNext').addEventListener('click', function () { goTo(page + 1); });
+
+  /* swipe between pages */
+  var swiping = false, swipeX = 0, swipeY = 0, swipeId = null;
+  viewport.addEventListener('pointerdown', function (e) {
+    if (pageCount < 2) return;
+    swiping = true; swipeX = e.clientX; swipeY = e.clientY; swipeId = e.pointerId;
+  });
+  viewport.addEventListener('pointermove', function (e) {
+    if (!swiping || e.pointerId !== swipeId) return;
+    var dx = e.clientX - swipeX;
+    if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(e.clientY - swipeY)) {
+      track.classList.add('drag');
+      track.style.transform = 'translateX(calc(' + (-page * 100) + '% + ' + dx + 'px))';
+    }
+  });
+  function endSwipe(e) {
+    if (!swiping || e.pointerId !== swipeId) return;
+    swiping = false;
+    track.classList.remove('drag');
+    var dx = e.clientX - swipeX;
+    if (dx <= -60) goTo(page + 1);
+    else if (dx >= 60) goTo(page - 1);
+    else goTo(page);
+  }
+  viewport.addEventListener('pointerup', endSwipe);
+  viewport.addEventListener('pointercancel', endSwipe);
+
+  /* ---------- render ---------- */
   function render(s) {
     state = s;
     applyBackground(s);
     headerEl.className = 'c-' + (s.clock || 'bold');
     clockFormat = s.clockfmt || '24';
     tick();
-    deck.style.gridTemplateColumns = 'repeat(' + s.cols + ',1fr)';
-    deck.style.gridTemplateRows = 'repeat(' + s.rows + ',1fr)';
-    deck.innerHTML = '';
-    var frag = document.createDocumentFragment();
-    for (var i = 0; i < s.buttons.length; i++) {
-      (function (b, idx) {
-        var cell = document.createElement('div');
-        cell.className = 'cell';
-        var t = document.createElement('button');
-        t.className = 'tile';
-        t.style.setProperty('--c', b.color || '#39ff14');
-        var sc = scatter(idx);
-        t.style.setProperty('--r', sc.r + 'deg');
-        t.style.setProperty('--x', sc.x + 'px');
-        t.style.setProperty('--y', sc.y + 'px');
-        t.style.setProperty('--s', sc.s);
-        var icon = b.icon || '\u2022';
-        var lb = document.createElement('span');
-        lb.className = 'lb';
-        lb.textContent = b.label || '';
-        if (icon.indexOf('img:') === 0) {
-          var img = document.createElement('img');
-          img.className = 'ic-img';
-          img.alt = '';
-          img.src = '/icons/' + encodeURIComponent(icon.substring(4));
-          t.appendChild(img);
-        } else {
-          var ic = document.createElement('span');
-          ic.className = 'ic';
-          ic.textContent = icon;
-          t.appendChild(ic);
-        }
-        t.appendChild(lb);
-        t.addEventListener('click', function () { press(b, t); });
-        cell.appendChild(t);
-        frag.appendChild(cell);
-      })(s.buttons[i], i);
+
+    var perPage = s.cols * s.rows;
+    pageCount = Math.max(1, s.pages || Math.ceil(s.buttons.length / perPage) || 1);
+    track.innerHTML = '';
+    dotsEl.innerHTML = '';
+
+    for (var p = 0; p < pageCount; p++) {
+      var pg = document.createElement('div');
+      pg.className = 'page';
+      pg.style.gridTemplateColumns = 'repeat(' + s.cols + ',1fr)';
+      pg.style.gridTemplateRows = 'repeat(' + s.rows + ',1fr)';
+      for (var i = 0; i < perPage; i++) {
+        var idx = p * perPage + i;
+        if (idx >= s.buttons.length) break;
+        pg.appendChild(makeTile(s.buttons[idx]));
+      }
+      track.appendChild(pg);
+
+      if (pageCount > 1) {
+        (function (pp) {
+          var d = document.createElement('button');
+          d.className = 'dot';
+          d.type = 'button';
+          d.setAttribute('aria-label', 'Page ' + (pp + 1));
+          d.addEventListener('click', function () { goTo(pp); });
+          dotsEl.appendChild(d);
+        })(p);
+      }
     }
-    deck.appendChild(frag);
+    dotsEl.className = pageCount > 1 ? 'dots on' : 'dots';
+    if (page >= pageCount) page = pageCount - 1;
+    goTo(page, true);
     layout();
+  }
+
+  function makeTile(b) {
+    var cell = document.createElement('div');
+    cell.className = 'cell';
+    var t = document.createElement('button');
+    t.className = 'tile';
+    t.type = 'button';
+    t.style.setProperty('--c', b.color || '#34d399');
+    var icon = b.icon || '\u2022';
+    var chip = document.createElement('span');
+    chip.className = 'chip';
+    if (icon.indexOf('img:') === 0) {
+      var img = document.createElement('img');
+      img.className = 'ic-img';
+      img.alt = '';
+      img.src = '/icons/' + encodeURIComponent(icon.substring(4));
+      chip.appendChild(img);
+    } else {
+      var ic = document.createElement('span');
+      ic.className = 'ic';
+      ic.textContent = icon;
+      chip.appendChild(ic);
+    }
+    var lb = document.createElement('span');
+    lb.className = 'lb';
+    lb.textContent = b.label || '';
+    t.appendChild(chip);
+    t.appendChild(lb);
+    t.addEventListener('click', function () { press(b, t); });
+    cell.appendChild(t);
+    return cell;
   }
 
   var busy = false;
   function press(b, el) {
-    el.classList.add('active');
-    setTimeout(function () { el.classList.remove('active'); }, 170);
+    el.classList.add('flash');
+    setTimeout(function () { el.classList.remove('flash'); }, 260);
     if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
     if (busy) return;
     busy = true;
@@ -340,26 +617,91 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: b.id })
     }).then(function (r) {
-      return r.json().then(function (j) { return { response: r, body: j }; });
-    }).then(function (result) {
-        if (result.response.status === 403) {
-          showPairing(result.body.msg || 'Pair this browser with the desktop app.');
-          return;
+      return r.json().then(function (j) {
+        if (r.status === 403) {
+          showPairing(j.msg || 'Pair this browser with the desktop app.');
+          return null;
         }
-        var j = result.body;
+        return j;
+      });
+    }).then(function (j) {
+        if (!j) return;
         toast(j.msg || (j.ok ? 'OK' : 'Error'), !!j.ok);
         offlineEl.className = 'offline';
       })
       .catch(function () {
-        toast('\u0644\u0627 \u064a\u0648\u062c\u062f \u0627\u062a\u0635\u0627\u0644 \u0628\u0627\u0644\u0643\u0645\u0628\u064a\u0648\u062a\u0631', false);
+        toast('No connection to the computer', false);
         offlineEl.className = 'offline show';
       })
       .then(function () { setTimeout(function () { busy = false; }, 220); });
   }
 
-  function formatTime(seconds) {
-    seconds = Math.max(0, Math.floor(Number(seconds) || 0));
-    return Math.floor(seconds / 60) + ':' + pad(seconds % 60);
+  /* ---------- now playing ---------- */
+  function fmtTime(sec) {
+    if (!isFinite(sec) || sec < 0) sec = 0;
+    var m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return m + ':' + (s < 10 ? '0' + s : '' + s);
+  }
+
+  function setArt(img, url, done) {
+    img.onerror = function () { img.style.visibility = 'hidden'; };
+    img.onload = function () {
+      img.style.visibility = 'visible';
+      if (done) done(img);
+    };
+    img.src = url;
+  }
+
+  function accentFromImage(img) {
+    try {
+      var size = 40;
+      var cv = document.createElement('canvas');
+      cv.width = size; cv.height = size;
+      var g = cv.getContext('2d');
+      g.drawImage(img, 0, 0, size, size);
+      var d = g.getImageData(0, 0, size, size).data;
+      var bins = [];
+      for (var b = 0; b < 24; b++) bins.push(0);
+      for (var i = 0; i < d.length; i += 4) {
+        var r = d[i] / 255, gg = d[i + 1] / 255, bb = d[i + 2] / 255;
+        var mx = Math.max(r, gg, bb), mn = Math.min(r, gg, bb);
+        var l = (mx + mn) / 2;
+        var s = mx === mn ? 0 : (mx - mn) / (1 - Math.abs(2 * l - 1));
+        if (s < 0.35 || l < 0.16 || l > 0.9) continue;
+        var h;
+        if (mx === r) h = 60 * (((gg - bb) / (mx - mn)) % 6);
+        else if (mx === gg) h = 60 * ((bb - r) / (mx - mn) + 2);
+        else h = 60 * ((r - gg) / (mx - mn) + 4);
+        if (h < 0) h += 360;
+        var bin = Math.floor(h / 15) % 24;
+        bins[bin] += s * (0.45 + 0.55 * (1 - Math.abs(l - 0.55) * 2));
+      }
+      var bi = 0;
+      for (var k = 1; k < 24; k++) if (bins[k] > bins[bi]) bi = k;
+      if (bins[bi] <= 0) return null;
+      return 'hsl(' + Math.round(bi * 15 + 7.5) + ', 90%, 62%)';
+    } catch (e) { return null; }
+  }
+
+  function applyAccent(color) {
+    document.documentElement.style.setProperty('--acc', color || '#34d399');
+  }
+
+  function progress() {
+    if (!nowData || nowData.end <= 0) return;
+    var pct = Math.max(0, Math.min(100, nowData.pos / nowData.end * 100));
+    pBarEl.style.width = pct.toFixed(2) + '%';
+    pPosEl.textContent = fmtTime(nowData.pos);
+    pEndEl.textContent = fmtTime(nowData.end);
+  }
+
+  function openPlayer() {
+    if (!nowData || nowData.on !== 1) return;
+    playerOpen = true;
+    playerEl.classList.add('open');
+    playerEl.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('player-open');
+    progress();
   }
 
   function closePlayer() {
@@ -369,85 +711,78 @@
     document.body.classList.remove('player-open');
   }
 
-  function updateProgress() {
-    if (!nowData) return;
-    var duration = Number(nowData.end) || 0;
-    var position = Number(nowData.pos) || 0;
-    playerNodes.bar.style.width = duration > 0 ? Math.max(0, Math.min(100, position / duration * 100)) + '%' : '0%';
-    playerNodes.position.textContent = formatTime(position);
-    playerNodes.duration.textContent = formatTime(duration);
-  }
-
-  function applyNow(data) {
-    nowData = data;
-    if (!data || data.on !== 1 || !data.title) {
+  function applyNow(n) {
+    nowData = n;
+    var has = n && n.on === 1 && n.title;
+    if (!has) {
       nowEl.classList.remove('show');
       if (playerOpen) closePlayer();
       return;
     }
-
     nowEl.classList.add('show');
-    playerNodes.nowTitle.textContent = data.title;
-    playerNodes.nowArtist.textContent = data.artist || '';
-    playerNodes.title.textContent = data.title;
-    playerNodes.artist.textContent = data.artist || '';
-    playerNodes.album.textContent = data.album || '';
-    playerNodes.toggle.textContent = data.playing === 1 ? 'Ⅱ' : '▶';
-    if (data.cover !== lastCover) {
-      lastCover = data.cover;
-      var coverUrl = '/api/cover?v=' + encodeURIComponent(data.cover);
-      [playerNodes.nowArt, playerNodes.art].forEach(function (image) {
-        image.style.visibility = 'visible';
-        image.onerror = function () { image.style.visibility = 'hidden'; };
-        image.src = coverUrl;
-      });
+    nowTitleEl.textContent = n.title;
+    nowArtistEl.textContent = n.artist || '';
+    nowEqEl.className = 'eq' + (n.playing === 1 ? ' play' : '');
+    if (n.cover !== lastCover) {
+      lastCover = n.cover;
+      var url = '/api/cover?s=' + n.cover;
+      setArt(nowArtEl, url);
+      setArt(pArtEl, url, function (img) { applyAccent(accentFromImage(img)); });
+      pGlowEl.src = url;
     }
-    updateProgress();
+    pTitleEl.textContent = n.title;
+    pArtistEl.textContent = n.artist || '';
+    if (n.playing === 1) pPlayEl.classList.add('playing');
+    else pPlayEl.classList.remove('playing');
+    progress();
   }
 
+  var nowJson = '';
   function loadNow() {
-    fetch('/api/now', { cache: 'no-store' }).then(function (response) {
-      return response.json();
-    }).then(applyNow).catch(function () {});
+    fetch('/api/now', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (n) {
+        var j = JSON.stringify(n);
+        if (j !== nowJson) { nowJson = j; applyNow(n); }
+        else { nowData = n; }
+      })
+      .catch(function () {});
   }
 
-  function sendMedia(command) {
+  setInterval(function () {
+    if (!playerOpen || !nowData || nowData.playing !== 1) return;
+    if (nowData.end > 0 && nowData.pos < nowData.end) nowData.pos += 1;
+    progress();
+  }, 1000);
+
+  function media(cmd) {
     fetch('/api/media', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cmd: command })
-    }).then(function (response) {
-      return response.json().then(function (data) {
-        if (response.status === 403) {
+      body: JSON.stringify({ cmd: cmd })
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (r.status === 403) {
           showPairing(data.msg || 'Pair this browser with the desktop app.');
           return;
         }
         setTimeout(loadNow, 300);
+        setTimeout(loadNow, 1200);
       });
-    }).catch(function () {});
+    })
+      .catch(function () {});
   }
 
-  nowEl.addEventListener('click', function () {
-    if (!nowData || nowData.on !== 1) return;
-    playerOpen = true;
-    playerEl.classList.add('open');
-    playerEl.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('player-open');
-    updateProgress();
-  });
-  document.getElementById('playerClose').addEventListener('click', closePlayer);
-  document.getElementById('playerToggle').addEventListener('click', function () { sendMedia('toggle'); });
-  document.getElementById('playerPrev').addEventListener('click', function () { sendMedia('prev'); });
-  document.getElementById('playerNext').addEventListener('click', function () { sendMedia('next'); });
-  setInterval(function () {
-    if (playerOpen && nowData && nowData.playing === 1 && nowData.end > nowData.pos) {
-      nowData.pos += 1;
-      updateProgress();
-    }
-  }, 1000);
+  nowEl.addEventListener('click', openPlayer);
+  document.getElementById('pExit').addEventListener('click', function (e) { e.stopPropagation(); closePlayer(); });
+  pPlayEl.addEventListener('click', function () { media('toggle'); });
+  document.getElementById('pPrev').addEventListener('click', function () { media('prev'); });
+  document.getElementById('pNext').addEventListener('click', function () { media('next'); });
+
   loadNow();
   setInterval(loadNow, 2000);
 
+  /* ---------- state polling ---------- */
   var lastJson = '';
   function load() {
     fetch('/api/state', { cache: 'no-store' })
@@ -464,15 +799,15 @@
       .catch(function () { offlineEl.className = 'offline show'; });
   }
 
-  // Prevent screen sleep / screensaver via silent audio loop + wake lock
+  /* keep screen awake */
   function keepAlive() {
     if ('wakeLock' in navigator) {
-      try { navigator.wakeLock.request('screen').catch(function(){}); } catch(e){}
+      try { navigator.wakeLock.request('screen').catch(function () {}); } catch (e) {}
     }
   }
   keepAlive();
-  document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible') { keepAlive(); }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') keepAlive();
   });
 
   window.addEventListener('resize', layout);

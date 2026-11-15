@@ -1,6 +1,7 @@
 # Stro-Deck config (edited by the app)
 cols=4
 rows=3
+pages=1
 title=U1RSTy1ERUNL
 bg=aW1nOmJnXzIwMjYxMTA2XzEwNTE1NF8yMjAuanBn
 bgpos=dG9wIHJpZ2h0
