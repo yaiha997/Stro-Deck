@@ -4,7 +4,7 @@ Stro-Deck turns a phone or tablet browser into a customizable control panel for 
 
 [Download v1.0.2](https://github.com/yaiha997/Stro-Deck/releases/tag/v1.0.2) · [بالعربي](#بالعربي)
 
-![Stro-Deck desktop editor with the button grid and action settings](docs/images/stro-deck-desktop-app-redacted.png)
+![Stro-Deck desktop editor with the button grid and action settings](https://raw.githubusercontent.com/yaiha997/Stro-Deck/138622ff320cd37034f0c41d2ec6e2a3db391913/docs/images/stro-deck-desktop-app-redacted.png)
 
 ## Quick start
 
@@ -27,12 +27,12 @@ If Windows Firewall asks, allow access on your trusted private network.
     <th>Now playing</th>
   </tr>
   <tr>
-    <td><img src="docs/images/stro-deck-video-display.png" alt="Touch deck with shortcut tiles and a video background"></td>
+    <td><img src="https://raw.githubusercontent.com/yaiha997/Stro-Deck/138622ff320cd37034f0c41d2ec6e2a3db391913/docs/images/stro-deck-video-display.png" alt="Touch deck with shortcut tiles and a video background"></td>
     <td><img src="docs/images/spotify-now-playing.jpg" alt="Spotify track details and playback controls"></td>
   </tr>
 </table>
 
-[See the multi-page layout](docs/images/stro-deck-multi-page-grid.png)
+[See the multi-page layout](https://github.com/yaiha997/Stro-Deck/blob/138622ff320cd37034f0c41d2ec6e2a3db391913/docs/images/stro-deck-multi-page-grid.png)
 
 ## Google Nest Hub
 
@@ -69,7 +69,7 @@ powershell -ExecutionPolicy Bypass -File .\test_network_selection.ps1
 powershell -ExecutionPolicy Bypass -File .\test_deck_server.ps1
 ```
 
-Use [package-release.ps1](package-release.ps1) for the release ZIP or [build-installer.ps1](build-installer.ps1) with Inno Setup 6 for a Windows installer. After MCP setup, run `py -3 .\test_mcp_stdio.py` to check the MCP connection locally with a mock Cast command.
+Use [build-installer.ps1](build-installer.ps1) with Inno Setup 6 for a Windows installer. After MCP setup, run `py -3 .\test_mcp_stdio.py` to check the MCP connection locally with a mock Cast command.
 
 </details>
 
