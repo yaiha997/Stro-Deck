@@ -4,7 +4,7 @@ Stro-Deck turns a phone or tablet browser into a customizable control panel for 
 
 [Download v1.0.2](https://github.com/yaiha997/Stro-Deck/releases/tag/v1.0.2) · [بالعربي](#بالعربي)
 
-![Stro-Deck desktop editor with the button grid and action settings](https://raw.githubusercontent.com/yaiha997/Stro-Deck/138622ff320cd37034f0c41d2ec6e2a3db391913/docs/images/stro-deck-desktop-app-redacted.png)
+![Stro-Deck desktop editor with the button grid and action settings](docs/images/stro-deck-desktop-app-redacted.png)
 
 ## Quick start
 
@@ -27,12 +27,12 @@ If Windows Firewall asks, allow access on your trusted private network.
     <th>Now playing</th>
   </tr>
   <tr>
-    <td><img src="https://raw.githubusercontent.com/yaiha997/Stro-Deck/138622ff320cd37034f0c41d2ec6e2a3db391913/docs/images/stro-deck-video-display.png" alt="Touch deck with shortcut tiles and a video background"></td>
+    <td><img src="docs/images/stro-deck-video-display.png" alt="Touch deck with shortcut tiles and a video background"></td>
     <td><img src="docs/images/spotify-now-playing.jpg" alt="Spotify track details and playback controls"></td>
   </tr>
 </table>
 
-[See the multi-page layout](https://github.com/yaiha997/Stro-Deck/blob/138622ff320cd37034f0c41d2ec6e2a3db391913/docs/images/stro-deck-multi-page-grid.png)
+[See the multi-page layout](docs/images/stro-deck-multi-page-grid.png)
 
 ## Google Nest Hub
 
@@ -85,4 +85,5 @@ Stro-Deck يحوّل متصفح الجوال أو التابلت إلى لوحة
 
 ## Share Stro-Deck
 
-[Wide graphic](docs/images/stro-deck-promo-1200x630.svg) · [Square graphic](docs/images/stro-deck-promo-square.svg) · [English and Arabic captions](docs/promotion.md)
+[Share captions in English and Arabic](docs/promotion.md)
+
